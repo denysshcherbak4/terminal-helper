@@ -36,7 +36,7 @@ jobs:
           /bin/zsh --version >> results/environment.txt
           swift --version >> results/environment.txt
       - name: Shell syntax
-        run: find Integration -name '*.zsh' -exec /bin/zsh -n {} \;
+        run: for script in Integration/*.zsh; do /bin/zsh -n "$script"; done
       - name: ZLE and installer tests
         run: |
           python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt

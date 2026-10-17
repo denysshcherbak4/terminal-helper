@@ -13,7 +13,7 @@ The MVP workflow runs on GitHub-hosted macOS 15 Apple Silicon and Intel, with co
 - A controller lifecycle test invokes actual toggle and Disable and Quit actions against isolated temporary state.
 - The real native Settings content is rendered to PNG for visual review. This is a view render, not a screen recording or proof of every menu/assistive-technology behavior.
 
-The first strictly validated shell run at [ba81b5b](https://github.com/denysshcherbak4/terminal-helper/commit/ba81b5b2377b0781fc1bd1ed7fcddeca42cd31e1) passed 27 PTY tests (one case-sensitive skip) and four installer tests on each architecture. That complete run failed in the native render exporter. Later runs add the bracketed-paste and dedicated case-volume checks and correct the exporter; consult the final PR/run status rather than treating the earlier run as fully green.
+At [12f8e781](https://github.com/denysshcherbak4/terminal-helper/commit/12f8e78193dcc9a166da32c0c703e36af8f30175), [strict CI](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39042291494) passed 29 PTY cases (one default-filesystem skip), four installer cases, and the dedicated HFSX case on each architecture. Universal compilation, state and actual controller/worker-group lifecycle checks passed. A successful PNG export alone did not prove visual correctness; the exporter now also rejects blank/transparent pixels, and the final PR records the visual inspection of the replacement.
 
 ## Measurement method
 
@@ -21,7 +21,25 @@ Startup: 40 paired fresh `zsh -d -f -i` subprocesses per condition, with identic
 
 Completion: actual PTY Tab to a visible useful filename, 256 ordinary fixture files plus the private state directory, 30 repetitions. The warm benchmark initializes completion before timing. A separate benchmark uses 30 fresh shells with no `compinit` setup and includes its first-Tab cost. Do not apply warm results to an unconfigured beginner shell.
 
-At ba81b5b the configured-shell first observation was 26.24 ms (Apple M1 virtual runner) / 30.34 ms (Intel runner); warm p95 was 10.38 / 9.82 ms. These are fixture observations, not universal latency claims. Fresh-shell results, final startup and controller measurements are in the validated artifact and final PR table.
+Recorded snapshot from exact commit 12f8e781, macOS 15.7.9, zsh 5.9, Swift 6.1.2, GitHub-hosted Apple M1 (Virtual) and Intel Core i7-8700B @3.20GHz:
+
+| Measurement | Apple M1 VM | Intel VM |
+| --- | ---: | ---: |
+| Configured first Tab observation | 15.45 ms | 45.86 ms |
+| Configured warm completion p95 | 11.84 ms | 19.61 ms |
+| Unconfigured first observation | 182.52 ms | 563.01 ms |
+| Unconfigured fresh-shell first Tab p95 | 234.93 ms | 645.82 ms |
+| Baseline startup p95 | 176.23 ms | 779.98 ms |
+| Integrated startup p95 | 198.40 ms | 652.73 ms |
+| Paired added startup p95 | 38.18 ms | 122.66 ms |
+| Paired added startup median | 4.48 ms | 3.87 ms |
+| Off median RSS | 26,224 KiB | 17,712 KiB |
+| Settled interval CPU | 0.935% | 0% at measurement resolution |
+| Controller processes / owned children | 1 / 0 | 1 / 0 |
+| Logical app bytes | 523,398 | 523,398 |
+| Compressed universal app ZIP bytes | 196,095 | 196,095 |
+
+The 30 ms paired-startup and 100 ms unconfigured-first-Tab targets were **not achieved** in this run. Shared-runner wall-clock variance is substantial: the paired median is small and the Intel integrated p95 is lower than baseline, while the paired-difference tail is positive. These measurements do not isolate causality or predict a physical Mac. Secure first-use completion initialization is included in the unconfigured benchmark. No security checks were removed to improve timing. Current exact-run measurements remain available in its JSON artifact; do not silently substitute warm values for first use.
 
 Idle controller: allow a two-second settle, take six one-second RSS/CPU/child-process samples, and calculate CPU consumed over the settled sample interval. OS `ps %CPU` may include process startup; the interval value is the idle measurement. Record logical app bytes, compressed ZIP bytes, hardware, OS, shell, Swift version, and signature status.
 
@@ -34,7 +52,7 @@ Targets: added startup p95 ≤30 ms, first useful suggestion p95 ≤100 ms. Repo
 | macOS 15, Apple Silicon and Intel, zsh 5.9 | Automated PTY, native compilation/state/lifecycle, fixture and measurement jobs; exact results in the selected run. |
 | macOS 13 minimum | Deployment target and selected API availability; oldest-OS runtime validation remains manual. |
 | Terminal.app | Primary intended terminal; generic PTY testing covers real ZLE, but the actual Terminal.app user flow remains a manual release check. |
-| iTerm2 | Not manually validated; no compatibility claim beyond the shared zsh/PTTY mechanism. |
+| iTerm2 | Not manually validated; no compatibility claim beyond the shared zsh/PTY mechanism. |
 | Case-insensitive filesystem | Default runner fixtures. |
 | Case-sensitive filesystem | Dedicated runner-owned HFSX fixture; case-sensitive APFS still merits manual testing. |
 | Custom ZDOTDIR | Explicit folder selection in Settings, with installer fixture containing spaces. |
