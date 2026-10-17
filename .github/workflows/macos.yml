@@ -6,6 +6,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 concurrency:
   group: terminal-helper-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
@@ -24,6 +26,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          ref: ${{ env.SOURCE_SHA }}
       - name: Environment
         run: |
           mkdir -p results dist
@@ -58,7 +61,7 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         run: |
           version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'dist/Terminal Helper.app/Contents/Info.plist')
-          ditto -c -k --sequesterRsrc --keepParent 'dist/Terminal Helper.app' "dist/Terminal-Helper-${version}-${GITHUB_SHA:0:12}-universal.zip"
+          ditto -c -k --sequesterRsrc --keepParent 'dist/Terminal Helper.app' "dist/Terminal-Helper-${version}-${SOURCE_SHA:0:12}-universal.zip"
           cd dist
           shasum -a 256 *.zip > SHA256SUMS.txt
           du -sh 'Terminal Helper.app' >> ../results/environment.txt
@@ -67,7 +70,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Terminal-Helper-${{ matrix.runner }}-${{ github.sha }}
+          name: Terminal-Helper-${{ matrix.runner }}-${{ env.SOURCE_SHA }}
           path: |
             dist/*.zip
             dist/SHA256SUMS.txt
