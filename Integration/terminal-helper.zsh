@@ -1,7 +1,7 @@
 # Sourced by the explicitly installed interactive zsh integration.
 [[ -o interactive ]] || return 0
 (( ${+_TH_LOADED} )) && return 0
-typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0
+typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0
 zmodload zsh/stat || return 0
 zmodload zsh/mapfile || return 0
 
@@ -24,11 +24,12 @@ _th_supported() {
 
 _th_correct() {
   setopt localoptions extendedglob nullglob
-  local token=$PREFIX parent leaf candidate
+  local token=$PREFIX parent leaf candidate insert_parent=
   [[ -n "$token" ]] || return 1
   [[ -e "$token" || -L "$token" ]] && return 1
   if [[ "$token" == */* ]]; then
     parent=${token:h}
+    insert_parent="$parent/"
     leaf=${token:t}
   else
     parent=.
@@ -37,9 +38,9 @@ _th_correct() {
   [[ "$parent" == '~' ]] && parent=$HOME
   [[ "$parent" == '~/'* ]] && parent="$HOME/${parent#\~/}"
   [[ -d "$parent" && ${#leaf} -ge 3 && ${#leaf} -le 128 ]] || return 1
-  # shortcut: directory enumeration is filesystem-dependent; no fuzzy work above 256 entries.
+  # Short-circuit enumeration after 257 entries; native command completions have their own limits.
   local -a entries candidates
-  entries=("$parent"/*(ND[1,257]))
+  entries=("$parent"/*(NDY257))
   (( ${#entries} <= 256 )) || return 1
   for candidate in "$entries[@]"; do
     [[ "${candidate:t}" == *[[:cntrl:]]* ]] && continue
@@ -51,7 +52,7 @@ _th_correct() {
   (( ${#candidates} )) || return 1
   local -a expl
   _description corrections expl 'typo corrections (choose explicitly)'
-  compadd "$expl[@]" -W "$parent" -- "$candidates[@]"
+  compadd "$expl[@]" -U -f -p "$insert_parent" -W "$parent" -- "$candidates[@]"
 }
 
 _th_tab() {
@@ -62,6 +63,7 @@ _th_tab() {
     # Retain zsh completion ownership/permission checks and avoid dump/cache creation.
     compinit -D || return 0
   fi
+  _TH_CANCELLED=0
   _TH_ORIGINAL=$BUFFER
   _TH_CURSOR=$CURSOR
   _TH_ACTIVE=1
@@ -79,6 +81,10 @@ _th_completion() {
 }
 
 _th_accept() {
+  if (( _TH_CANCELLED )); then
+    _TH_CANCELLED=0
+    return 0
+  fi
   if (( _TH_ACTIVE )); then
     _th_enabled || { BUFFER=$_TH_ORIGINAL; CURSOR=$_TH_CURSOR; }
     _TH_ACTIVE=0
@@ -95,7 +101,11 @@ _th_cancel() {
     _TH_ACTIVE=0
     zle -M ''
   else
-    zle send-break
+    if (( ${+widgets[_th_original_escape]} )); then
+      zle _th_original_escape
+    else
+      zle send-break
+    fi
   fi
 }
 
@@ -104,15 +114,26 @@ _th_redraw() {
     BUFFER=$_TH_ORIGINAL
     CURSOR=$_TH_CURSOR
     _TH_ACTIVE=0
+    _TH_CANCELLED=1
     zle -M 'Terminal Helper: Off; suggestion cancelled'
   fi
 }
 
-_th_line_finish() { _TH_ACTIVE=0; }
+_th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; }
+
+_th_menu_accept() {
+  # A custom menu widget exits selection; never accept/execute the command here.
+  (( _TH_ACTIVE || _TH_CANCELLED )) && _th_accept
+  return 0
+}
 
 zle -A accept-line _th_original_accept
+typeset _th_escape_binding=${${(z)$(bindkey '^[')}[-1]}
+[[ -z $_th_escape_binding || $_th_escape_binding == undefined-key ]] || zle -A "$_th_escape_binding" _th_original_escape
+unset _th_escape_binding
 zle -N _th_tab
 zle -N _th_accept
+zle -N _th_menu_accept
 zle -N _th_cancel
 zle -C _th_completion complete-word _th_completion
 # Tab is the explicit opt-in binding; Enter delegates unchanged when idle.
@@ -120,8 +141,8 @@ bindkey '^I' _th_tab
 bindkey '^[' _th_cancel
 zle -N accept-line _th_accept
 zmodload zsh/complist
-bindkey -M menuselect '^M' _th_accept
-bindkey -M menuselect '^J' _th_accept
+bindkey -M menuselect '^M' _th_menu_accept
+bindkey -M menuselect '^J' _th_menu_accept
 bindkey -M menuselect '^I' _th_tab
 bindkey -M menuselect '^[' _th_cancel
 autoload -Uz add-zle-hook-widget
