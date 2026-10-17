@@ -60,15 +60,34 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let context = NSGraphicsContext(bitmapImageRep: opaque) else {
                     fputs("Native render failed: cannot create bitmap graphics context.\n", stderr); exit(1)
                 }
-                NSGraphicsContext.saveGraphicsState()
-                NSGraphicsContext.current = context
-                view.effectiveAppearance.performAsCurrentDrawingAppearance {
-                    let bounds = NSRect(x: 0, y: 0, width: CGFloat(rep.pixelsWide), height: CGFloat(rep.pixelsHigh))
-                    NSColor.windowBackgroundColor.setFill()
-                    NSBezierPath(rect: bounds).fill()
-                    rep.draw(in: bounds)
+                guard let captured = rep.cgImage else {
+                    fputs("Native render failed: cannot resolve captured image.\n", stderr); exit(1)
                 }
-                NSGraphicsContext.restoreGraphicsState()
+                let graphics = context.cgContext
+                let bounds = CGRect(x: 0, y: 0, width: CGFloat(rep.pixelsWide), height: CGFloat(rep.pixelsHigh))
+                view.effectiveAppearance.performAsCurrentDrawingAppearance {
+                    let background = NSColor.windowBackgroundColor.usingColorSpace(.deviceRGB) ?? .white
+                    graphics.setFillColor(background.cgColor)
+                    graphics.fill(bounds)
+                }
+                graphics.draw(captured, in: bounds)
+                graphics.flush()
+                guard let pixels = opaque.bitmapData, opaque.bitsPerPixel == 32 else {
+                    fputs("Native render failed: output pixel storage is unavailable.\n", stderr); exit(1)
+                }
+                var varied = false
+                for y in 0..<opaque.pixelsHigh {
+                    for x in 0..<opaque.pixelsWide {
+                        let offset = y * opaque.bytesPerRow + x * 4
+                        guard pixels[offset + 3] == 255 else {
+                            fputs("Native render failed: transparent output pixel.\n", stderr); exit(1)
+                        }
+                        if pixels[offset] != pixels[0] || pixels[offset + 1] != pixels[1] || pixels[offset + 2] != pixels[2] { varied = true }
+                    }
+                }
+                guard varied else {
+                    fputs("Native render failed: blank output image.\n", stderr); exit(1)
+                }
                 do {
                     guard let png = opaque.representation(using: .png, properties: [:]) else {
                         fputs("Native render failed: cannot encode PNG.\n", stderr); exit(1)
