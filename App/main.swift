@@ -33,7 +33,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add("Disable and Quit", action: #selector(disableAndQuit), key: "q")
         item.menu = menu
         refresh()
-        if let position = CommandLine.arguments.firstIndex(of: "--ui-smoke-test"), position + 1 < CommandLine.arguments.count {
+        if CommandLine.arguments.contains("--smoke-test") { showSettings() }
+        if let position = CommandLine.arguments.firstIndex(where: { $0 == "--ui-smoke-test" || $0 == "--render-preview" }), position + 1 < CommandLine.arguments.count {
             showSettings()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 guard let view = self.window?.contentView,
@@ -60,7 +61,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let enabled = state.enabled()
         status.title = "Suggestions: \(enabled ? "On" : "Off")"
         toggle.state = enabled ? .on : .off
-        integration.title = integrationInstalled ? "Shell integration: installed (restart shell)" : "Shell integration: not installed"
+        integration.title = integrationInstalled ? "Integration file present; restart shells" : "Shell integration: not installed"
         item.button?.setAccessibilityValue(enabled ? "On" : "Off")
         settingsToggle?.state = toggle.state
         settingsStatus?.stringValue = status.title + "\n" + integration.title

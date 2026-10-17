@@ -37,10 +37,10 @@ final class SuggestionState {
         guard file >= 0 else { return false }
         defer { close(file) }
         var st = stat()
-        guard fstat(file, &st) == 0, safeFile(st), st.st_size == 21 else { return false }
+        guard fstat(file, &st) == 0, safeFile(st), st.st_size == 22 else { return false }
         var bytes = [UInt8](repeating: 0, count: 23)
         let count = read(file, &bytes, bytes.count)
-        return count == 21 && Data(bytes.prefix(count)) == Data("terminal-helper-v1:on\n".utf8)
+        return count == 22 && Data(bytes.prefix(count)) == Data("terminal-helper-v1:on\n".utf8)
     }
     func write(enabled: Bool) throws {
         let fd = try directory(create: true)
