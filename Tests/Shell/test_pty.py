@@ -161,6 +161,16 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('$(touch ', self.shell.buffer())
         self.assertFalse(sentinel.exists())
 
+    def test_bracketed_paste_multiline_is_inert_and_unchanged(self):
+        sentinel = self.home / 'PASTE_MUST_NOT_EXECUTE'
+        text = 'touch ' + str(sentinel) + '\nprint PASTED_SECOND'
+        self.shell.send('\x1b[200~' + text + '\x1b[201~\t')
+        self.shell.read(0.8)
+        out = self.shell.buffer().replace('\r\n', '\n')
+        expected = 'DUMP:"' + text + '":' + str(len(text))
+        self.assertIn(expected, out)
+        self.assertFalse(sentinel.exists())
+
     def test_multiline_unsupported(self):
         self.shell.send("function multiline_buffer() { BUFFER=$'echo first\\necho second'; CURSOR=${#BUFFER}; }; zle -N multiline_buffer; bindkey '^Y' multiline_buffer\n")
         self.shell.read()
