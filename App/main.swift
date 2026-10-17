@@ -11,6 +11,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsToggle: NSButton?
     private var settingsStatus: NSTextField?
     private var worker: Process?
+    private var configurationDirectory = FileManager.default.homeDirectoryForCurrentUser
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -108,7 +109,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: "OK"); NSApp.activate(ignoringOtherApps: true); alert.runModal()
     }
     @objc private func showHelp() {
-        report("Terminal Helper", detail: "1. Install shell integration in Settings, then open a new zsh session.\n2. Enable suggestions from the menu bar.\n3. Tab opens completion; arrows select, Enter accepts text, and Escape cancels. Execute separately with Enter after the menu closes.\n\nOff and Disable and Quit are checked at the next completion or acceptance. Existing shell completion definitions run with your user privileges.\n\nUninstall integration from Settings before deleting the app. Documentation is included in the app's Resources/Docs folder. No history, command buffers, or filenames are logged.")
+        report("Terminal Helper", detail: "1. Install shell integration in Settings. Choose the folder containing your .zshrc (your ZDOTDIR, or home folder), then open a new zsh session.\n2. Enable suggestions from the menu bar.\n3. Tab opens completion; arrows select, Enter accepts text, and Escape cancels. Execute separately with Enter after the menu closes.\n\nOff and Disable and Quit are checked at the next completion or acceptance. Existing shell completion definitions run with your user privileges.\n\nUninstall integration from Settings using the same configuration folder before deleting the app. Documentation is included in the app's Resources/Docs folder. No history, command buffers, or filenames are logged.")
     }
     @objc private func installIntegration() { runIntegration("install") }
     @objc private func uninstallIntegration() {
@@ -124,10 +125,18 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let script = Bundle.main.url(forResource: operation, withExtension: "zsh", subdirectory: "Integration") else {
             report("Integration unavailable", detail: "Reinstall this app from a complete build."); return
         }
+        let chooser = NSOpenPanel()
+        chooser.title = "Choose your shell configuration folder"
+        chooser.message = "Select the folder containing your .zshrc: your ZDOTDIR if configured, otherwise your home folder. Hidden files do not need to be selected."
+        chooser.prompt = operation == "install" ? "Install here" : "Uninstall here"
+        chooser.canChooseDirectories = true; chooser.canChooseFiles = false; chooser.allowsMultipleSelection = false
+        chooser.directoryURL = configurationDirectory
+        guard chooser.runModal() == .OK, let selected = chooser.url else { return }
+        configurationDirectory = selected
         let process = Process(); process.executableURL = URL(fileURLWithPath: "/bin/zsh"); process.arguments = ["-f", script.path]
         // Installer output may include private paths; never forward it into app logs.
         process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
-        process.environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": ProcessInfo.processInfo.environment["ZDOTDIR"] ?? FileManager.default.homeDirectoryForCurrentUser.path]
+        process.environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": configurationDirectory.path]
         worker = process
         process.terminationHandler = { completed in
             DispatchQueue.main.async {
