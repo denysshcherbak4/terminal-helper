@@ -51,8 +51,19 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let view = self.window?.contentView,
                       let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
                 view.cacheDisplay(in: view.bounds, to: rep)
+                guard let opaque = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh, bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+                      let context = NSGraphicsContext(bitmapImageRep: opaque) else { exit(1) }
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = context
+                view.effectiveAppearance.performAsCurrentDrawingAppearance {
+                    let bounds = NSRect(x: 0, y: 0, width: CGFloat(rep.pixelsWide), height: CGFloat(rep.pixelsHigh))
+                    NSColor.windowBackgroundColor.setFill()
+                    NSBezierPath(rect: bounds).fill()
+                    rep.draw(in: bounds)
+                }
+                NSGraphicsContext.restoreGraphicsState()
                 do {
-                    try rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[position + 1]))
+                    try opaque.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[position + 1]))
                     print("PASS native Settings render"); NSApp.terminate(nil)
                 } catch { exit(1) }
             }
