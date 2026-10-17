@@ -49,5 +49,26 @@ class InstallationTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(config.read_bytes(), original)
 
+    def test_reversed_block_rejected_and_upgrade_repaired(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config = home / '.zshrc'
+            env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home)}
+            original = b'# <<< Terminal Helper managed integration <<<\n# >>> Terminal Helper managed integration >>>\nKEEP=1'
+            config.write_bytes(original)
+            result = subprocess.run(['/bin/zsh', str(ROOT / 'Integration/uninstall.zsh')], env=env, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(config.read_bytes(), original)
+            config.write_text('KEEP=1')
+            script = str(ROOT / 'Integration/install.zsh')
+            subprocess.run(['/bin/zsh', script], env=env, check=True, capture_output=True)
+            installed = home / 'Library/Application Support/Terminal Helper/integration.zsh'
+            installed.write_text('# old integration\n')
+            subprocess.run(['/bin/zsh', script], env=env, check=True, capture_output=True)
+            self.assertEqual(installed.read_bytes(), (ROOT / 'Integration/terminal-helper.zsh').read_bytes())
+            installed.unlink()
+            subprocess.run(['/bin/zsh', script], env=env, check=True, capture_output=True)
+            self.assertTrue(installed.is_file())
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
