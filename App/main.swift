@@ -49,10 +49,16 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showSettings()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 guard let view = self.window?.contentView,
-                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
+                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                    fputs("Native render failed: cannot capture Settings view.\n", stderr); exit(1)
+                }
                 view.cacheDisplay(in: view.bounds, to: rep)
-                guard let opaque = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh, bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
-                      let context = NSGraphicsContext(bitmapImageRep: opaque) else { exit(1) }
+                guard let opaque = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else {
+                    fputs("Native render failed: cannot allocate output bitmap.\n", stderr); exit(1)
+                }
+                guard let context = NSGraphicsContext(bitmapImageRep: opaque) else {
+                    fputs("Native render failed: cannot create bitmap graphics context.\n", stderr); exit(1)
+                }
                 NSGraphicsContext.saveGraphicsState()
                 NSGraphicsContext.current = context
                 view.effectiveAppearance.performAsCurrentDrawingAppearance {
@@ -63,9 +69,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 NSGraphicsContext.restoreGraphicsState()
                 do {
-                    try opaque.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[position + 1]))
+                    guard let png = opaque.representation(using: .png, properties: [:]) else {
+                        fputs("Native render failed: cannot encode PNG.\n", stderr); exit(1)
+                    }
+                    try png.write(to: URL(fileURLWithPath: CommandLine.arguments[position + 1]))
                     print("PASS native Settings render"); NSApp.terminate(nil)
-                } catch { exit(1) }
+                } catch { fputs("Native render failed: cannot write PNG artifact.\n", stderr); exit(1) }
             }
         }
     }
