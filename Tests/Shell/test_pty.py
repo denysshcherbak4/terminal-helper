@@ -126,6 +126,22 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('DUMP:', out)
         self.assertIn('cd ', out)
 
+    def test_leading_dash_fuzzy_requires_explicit_path(self):
+        candidate = self.home / '-rf'
+        candidate.write_text('KEEP')
+        important = self.home / 'important'
+        important.write_text('KEEP')
+        text = 'cat xrf important'
+        self.shell.send(text + '\x1b[D' * len(' important') + '\t')
+        self.shell.read(0.8)
+        self.assertIn('DUMP:"cat xrf important":7', self.shell.buffer())
+        self.shell.send('\x15')
+        self.complete('cat ./xrf')
+        self.shell.send('\r')
+        self.assertIn('./-rf', self.shell.buffer())
+        self.assertEqual(candidate.read_text(), 'KEEP')
+        self.assertEqual(important.read_text(), 'KEEP')
+
     def test_typo(self):
         self.complete('cd ' + str(self.home) + '/dents')
         self.shell.send('\r')
