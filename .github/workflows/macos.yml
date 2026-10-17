@@ -1,0 +1,96 @@
+name: macOS MVP
+on:
+  push:
+    branches: [main, feature/terminal-helper-mvp]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+concurrency:
+  group: terminal-helper-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ${{ env.SOURCE_SHA }}
+      - name: Environment
+        run: |
+          mkdir -p results dist
+          sw_vers > results/environment.txt
+          uname -m >> results/environment.txt
+          sysctl -n machdep.cpu.brand_string >> results/environment.txt
+          /bin/zsh --version >> results/environment.txt
+          swift --version >> results/environment.txt
+      - name: Shell syntax
+        run: for script in Integration/*.zsh; do /bin/zsh -n "$script"; done
+      - name: ZLE and installer tests
+        run: |
+          python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
+          if test -f Tests/Shell/test_install.py; then python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt; fi
+      - name: Case-sensitive filesystem
+        run: |
+          case_root=$(mktemp -d "$RUNNER_TEMP/terminal-helper-case.XXXXXX")
+          case_mount="$case_root/mount"
+          mkdir "$case_mount"
+          cleanup_case() {
+            hdiutil detach "$case_mount" >/dev/null 2>&1 || true
+            rm -f "$case_root/fixture.dmg"
+          }
+          trap cleanup_case EXIT
+          hdiutil create -size 64m -fs HFSX -volname THCaseSensitive "$case_root/fixture.dmg" >/dev/null
+          hdiutil attach -owners on -nobrowse -mountpoint "$case_mount" "$case_root/fixture.dmg" >/dev/null
+          mkdir "$case_mount/tmp"
+          TMPDIR="$case_mount/tmp" python3 Tests/Shell/test_pty.py CompletionTests.test_case_sensitive_fixture 2>&1 | tee results/case-sensitive-tests.txt
+      - name: Build universal app
+        id: build
+        if: always() && !cancelled()
+        run: bash Scripts/build.sh
+      - name: App state tests
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test | tee results/app-tests.txt'
+      - name: Controller lifecycle test
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test | tee results/lifecycle-tests.txt'
+      - name: Completion timing
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json
+      - name: Unconfigured first Tab timing
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_pty.py --benchmark-uninitialized | tee results/completion-uninitialized.json
+      - name: Performance and native smoke test
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: python3 Tests/Performance/measure.py
+      - name: Package test build
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'dist/Terminal Helper.app/Contents/Info.plist')
+          ditto -c -k --sequesterRsrc --keepParent 'dist/Terminal Helper.app' "dist/Terminal-Helper-${version}-${SOURCE_SHA:0:12}-universal.zip"
+          cd dist
+          shasum -a 256 *.zip > SHA256SUMS.txt
+          du -sh 'Terminal Helper.app' >> ../results/environment.txt
+          lipo -archs 'Terminal Helper.app/Contents/MacOS/TerminalHelper' >> ../results/environment.txt
+          codesign -dv 'Terminal Helper.app' 2>> ../results/environment.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Terminal-Helper-${{ matrix.runner }}-${{ env.SOURCE_SHA }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            results/
+          if-no-files-found: error
+          retention-days: 14

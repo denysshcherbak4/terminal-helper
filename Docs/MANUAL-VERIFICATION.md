@@ -1,0 +1,18 @@
+# Manual verification before release
+
+Run this checklist on a disposable macOS test account or a separately authorized machine. CI does not substitute for these real terminal and assistive-technology checks.
+
+1. On the oldest supported macOS and current macOS, install the signed/notarized app through a normal Finder download flow. Confirm no Xcode, Python, Node, permissions for Accessibility, or Screen Recording are requested.
+2. Open the menu-bar icon in light and dark appearance. Use keyboard navigation, VoiceOver, increased contrast, and Reduce Motion. Read On/Off and integration status without color. Confirm Settings, Help, and Disable and Quit are discoverable.
+3. Explicitly install integration. Verify a backup of the previous .zshrc; check ZDOTDIR with spaces. Repeat installation and repair without duplicate blocks. Try a .zshrc with no final newline, read-only configuration, symlinked configuration, and interruption during install. No unrelated bytes should be lost.
+4. In Terminal.app open two new zsh sessions. Enable assistance, complete a real directory with spaces/Unicode, an executable name, Git subcommand (where configured), CSV, Parquet, and .ipynb files. Verify displayed descriptions come from configured metadata.
+5. Try a typo in an intermediate path component. Verify exact and prefix matches precede labelled corrections; choose among ambiguous candidates. Existing valid paths stay valid. Test case-sensitive APFS and symlinks.
+6. Navigate the active menu with arrows/Tab. Enter accepts text without executing; a subsequent deliberate Enter executes. Escape restores the exact original buffer/cursor. Test completion with text after the cursor.
+7. Open a menu in each shell, toggle Off, and attempt acceptance. Pending results must not be accepted while disabled. Re-enable and repeat. Off must not generate suggestions or start app-owned workers. Check Activity Monitor for idle controller memory/CPU.
+8. Test single/double quotes, command substitution, backticks, shell operators, pasted/multiline input, and filenames containing control characters. Unsupported forms retain input; nothing is evaluated or executed. Use sentinel files to detect accidental execution.
+9. Compare original Tab, Enter, Escape, vi/emacs widgets, completion setup, and custom keybindings. Confirm uninstall removes only owned content and new shells retain original behavior. An already sourced shell may require restarting after uninstall.
+10. Choose Disable and Quit, then press Tab in both existing shells. Confirm assistance remains disabled and the controller exits. Simulate a failed state write and verify the app reports the failure.
+11. Repeat the terminal tests in iTerm2 when available. Record exact terminal/shell versions and keyboard settings. Do not advertise it as tested until this is done.
+12. Measure startup, first Tab, large/slow directories, cold/warm filesystem behavior, idle memory/CPU, process count, and artifact size against an identical baseline.
+
+Record date, exact commit/artifact checksum, hardware, macOS/zsh/terminal versions, results, and any failure. Do not publish a release with unresolved command-execution, quoting, Off, or configuration-preservation failures.
