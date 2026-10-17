@@ -68,6 +68,9 @@ jobs:
       - name: Completion timing
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json
+      - name: Unconfigured first Tab timing
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_pty.py --benchmark-uninitialized | tee results/completion-uninitialized.json
       - name: Performance and native smoke test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: python3 Tests/Performance/measure.py
