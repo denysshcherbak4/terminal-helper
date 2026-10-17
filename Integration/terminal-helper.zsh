@@ -10,22 +10,28 @@ _th_enabled() {
   local -A info
   [[ -d "$base" && ! -L "$base" && -O "$base" ]] || return 1
   zstat -H info -- "$base" 2>/dev/null || return 1
-  (( (info[mode] & 0777) == 0700 )) || return 1
+  (( (info[mode] & 8#777) == 8#700 )) || return 1
   [[ -f "$base/state" && ! -L "$base/state" && -O "$base/state" ]] || return 1
   zstat -H info -- "$base/state" 2>/dev/null || return 1
-  (( (info[mode] & 0777) == 0600 && info[size] == 22 )) || return 1
+  (( (info[mode] & 8#777) == 8#600 && info[size] == 22 )) || return 1
   value=${mapfile[$base/state]}
   [[ "$value" == $'terminal-helper-v1:on\n' ]]
 }
 
 _th_supported() {
-  [[ "$BUFFER" != *[[:cntrl:]]* && "$BUFFER" != *['$`*?[]{};|&<>()']* ]]
+  local forbidden
+  [[ "$BUFFER" != *[[:cntrl:]]* ]] || return 1
+  for forbidden in '$' '`' '*' '?' '[' ']' '{' '}' ';' '|' '&' '<' '>' '(' ')'; do
+    [[ "$BUFFER" != *"$forbidden"* ]] || return 1
+  done
+  return 0
 }
 
 _th_correct() {
   setopt localoptions extendedglob nullglob
   local token=$PREFIX parent leaf candidate insert_parent=
   [[ -n "$token" ]] || return 1
+  (( CURRENT > 1 )) || [[ "$token" == */* ]] || return 1
   [[ -e "$token" || -L "$token" ]] && return 1
   if [[ "$token" == */* ]]; then
     parent=${token:h}
@@ -64,9 +70,11 @@ _th_tab() {
     compinit -D || return 0
   fi
   _TH_CANCELLED=0
-  _TH_ORIGINAL=$BUFFER
-  _TH_CURSOR=$CURSOR
-  _TH_ACTIVE=1
+  if (( ! _TH_ACTIVE )); then
+    _TH_ORIGINAL=$BUFFER
+    _TH_CURSOR=$CURSOR
+    _TH_ACTIVE=1
+  fi
   zle _th_completion
 }
 
@@ -143,7 +151,7 @@ zle -N accept-line _th_accept
 zmodload zsh/complist
 bindkey -M menuselect '^M' _th_menu_accept
 bindkey -M menuselect '^J' _th_menu_accept
-bindkey -M menuselect '^I' _th_tab
+bindkey -M menuselect '^I' menu-complete
 bindkey -M menuselect '^[' _th_cancel
 autoload -Uz add-zle-hook-widget
 add-zle-hook-widget line-pre-redraw _th_redraw
