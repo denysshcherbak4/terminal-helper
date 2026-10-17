@@ -17,7 +17,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var window: NSWindow?
     private var settingsToggle: NSButton?
     private var settingsStatus: NSTextField?
-    private var worker: Process?
+    private var worker: IntegrationWorker?
+    private var lifecycleChild: pid_t?
     private var configurationDirectory = FileManager.default.homeDirectoryForCurrentUser
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -109,25 +110,53 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !state.enabled(), toggle.state == .off else { exit(1) }
         changeEnabled()
         guard state.enabled(), toggle.state == .on else { exit(1) }
-        disableAndQuit()
+        guard let root = lifecycleRoot else { exit(1) }
+        let pidFile = root.appendingPathComponent("child-pid")
+        // Fixed test-only program; no command buffer or discovered file is evaluated.
+        let program = "trap 'wait \"$child\"; exit 0' TERM; /bin/sleep 30 & child=$!; print -r -- \"$child\" > \"$1\"; wait \"$child\""
+        do {
+            worker = try IntegrationWorker(arguments: ["-f", "-c", program, "lifecycle-test", pidFile.path], environment: ["PATH": "/usr/bin:/bin"]) { _ in
+                self.worker = nil
+                guard self.quitting else { fputs("Lifecycle failed: worker exited before Quit.\n", stderr); exit(1) }
+                self.finishQuit()
+            }
+            waitForLifecycleChild(attempts: 100)
+        } catch { fputs("Lifecycle failed: cannot start owned test worker.\n", stderr); exit(1) }
+    }
+    private func waitForLifecycleChild(attempts: Int) {
+        if let root = lifecycleRoot,
+           let text = try? String(contentsOf: root.appendingPathComponent("child-pid"), encoding: .utf8),
+           let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 {
+            lifecycleChild = pid
+            disableAndQuit()
+        } else if attempts > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.waitForLifecycleChild(attempts: attempts - 1) }
+        } else {
+            worker?.terminate()
+            fputs("Lifecycle failed: owned test child did not start.\n", stderr); exit(1)
+        }
+    }
+    private func finishQuit() {
+        if let root = lifecycleRoot {
+            guard !state.enabled() else { fputs("Lifecycle failed: Quit left state On.\n", stderr); exit(1) }
+            if let child = lifecycleChild {
+                guard kill(child, 0) == -1, errno == ESRCH else {
+                    fputs("Lifecycle failed: owned child survived Quit.\n", stderr); exit(1)
+                }
+            }
+            do { try FileManager.default.removeItem(at: root) }
+            catch { fputs("Lifecycle failed: temporary state cleanup failed.\n", stderr); exit(1) }
+            print("PASS controller lifecycle: On, Off, re-enable, Disable and Quit writes Off and terminates owned worker group")
+        }
+        NSApp.terminate(nil)
     }
     @objc private func disableAndQuit() {
         guard !quitting else { return }
         do {
             try state.write(enabled: false)
-            if let root = lifecycleRoot {
-                guard !state.enabled() else { exit(1) }
-                try FileManager.default.removeItem(at: root)
-                print("PASS controller lifecycle: On, Off, re-enable, Disable and Quit writes Off")
-            }
             quitting = true
-            if let process = worker, process.isRunning {
-                process.terminate()
-                // Escalate only an explicit quit; idle Off has no timers or polling.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                }
-            } else { NSApp.terminate(nil) }
+            if let worker = worker, worker.isRunning { worker.terminate() }
+            else { finishQuit() }
         } catch { report("Could not disable safely", detail: "Terminal Helper will stay open. " + String(describing: error)) }
     }
     @objc private func showSettings() {
@@ -185,20 +214,15 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         chooser.directoryURL = configurationDirectory
         guard chooser.runModal() == .OK, let selected = chooser.url else { return }
         configurationDirectory = selected
-        let process = Process(); process.executableURL = URL(fileURLWithPath: "/bin/zsh"); process.arguments = ["-f", script.path]
-        // Installer output may include private paths; never forward it into app logs.
-        process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
-        process.environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": configurationDirectory.path]
-        worker = process
-        process.terminationHandler = { completed in
-            DispatchQueue.main.async {
+        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": configurationDirectory.path]
+        do {
+            worker = try IntegrationWorker(arguments: ["-f", script.path], environment: environment) { status in
                 self.worker = nil
-                if self.quitting { NSApp.terminate(nil); return }
+                if self.quitting { self.finishQuit(); return }
                 self.refresh()
-                self.report(completed.terminationStatus == 0 ? "Shell integration updated" : "Shell integration could not be updated", detail: completed.terminationStatus == 0 ? "Open a new terminal shell to use the updated configuration." : "Check that your shell configuration and Terminal Helper folder belong to you and are writable. See the troubleshooting guide; no configuration is overwritten.")
+                self.report(status == 0 ? "Shell integration updated" : "Shell integration could not be updated", detail: status == 0 ? "Open a new terminal shell to use the updated configuration." : "Check that your shell configuration and Terminal Helper folder belong to you and are writable. See the troubleshooting guide; no configuration is overwritten.")
             }
-        }
-        do { try process.run() } catch { worker = nil; report("Could not run installer", detail: "The bundled installer could not start.") }
+        } catch { worker = nil; report("Could not run installer", detail: "The bundled installer could not start.") }
     }
 }
 

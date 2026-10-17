@@ -9,7 +9,7 @@ app='dist/Terminal Helper.app'
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Integration" "$app/Contents/Resources/Docs"
 sdk="$(xcrun --sdk macosx --show-sdk-path)"
 for arch in arm64 x86_64; do
-    xcrun swiftc -O -sdk "$sdk" -target "$arch-apple-macosx13.0" App/State.swift App/Icon.swift App/main.swift -o "build/TerminalHelper-$arch" -framework AppKit
+    xcrun swiftc -O -sdk "$sdk" -target "$arch-apple-macosx13.0" App/State.swift App/Icon.swift App/IntegrationWorker.swift App/main.swift -o "build/TerminalHelper-$arch" -framework AppKit
 done
 xcrun lipo -create build/TerminalHelper-arm64 build/TerminalHelper-x86_64 -output "$app/Contents/MacOS/TerminalHelper"
 xcrun swiftc -O App/Icon.swift Scripts/GenerateIcon.swift -o build/generate-icon -framework AppKit
