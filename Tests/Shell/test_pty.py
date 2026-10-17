@@ -57,9 +57,20 @@ class Shell:
         return self.read()
 
     def close(self):
-        os.kill(self.pid, signal.SIGHUP)
-        os.waitpid(self.pid, 0)
-        os.close(self.fd)
+        try:
+            os.kill(self.pid, signal.SIGHUP)
+            deadline = time.monotonic() + 0.5
+            while time.monotonic() < deadline:
+                if os.waitpid(self.pid, os.WNOHANG)[0]:
+                    break
+                time.sleep(0.01)
+            else:
+                os.kill(self.pid, signal.SIGKILL)
+                os.waitpid(self.pid, 0)
+        except (ProcessLookupError, ChildProcessError):
+            pass
+        finally:
+            os.close(self.fd)
 
 
 class CompletionTests(unittest.TestCase):
@@ -179,6 +190,13 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('NORMAL_ENTER', self.shell.read())
 
 
+    def test_terminal_control_filename_is_displayed_safely(self):
+        out = self.complete('cat evi')
+        self.shell.send('\r')
+        out += self.shell.buffer()
+        self.assertIn('evil', out)
+        self.assertNotIn('\x1b[31m', out)
+
     def test_key_macro_refuses_integration_without_changing_binding(self):
         self.shell.close()
         self.shell = Shell(self.home, enter_macro=True)
@@ -216,11 +234,17 @@ class CompletionTests(unittest.TestCase):
 
     def test_quoted_path_and_hostile_filename_are_literal(self):
         sentinel = self.home / 'SHOULD_NOT_EXIST'
-        (self.home / '$(touch SHOULD_NOT_EXIST).csv').touch()
+        (self.home / 'attack$(touch SHOULD_NOT_EXIST).csv').touch()
+        self.complete('cat atta')
+        self.shell.send('\r')
+        out = self.shell.buffer()
+        self.assertIn('attack', out)
+        self.assertIn('SHOULD_NOT_EXIST', out)
+        self.assertFalse(sentinel.exists())
+        self.shell.send('\x15')
         self.complete('cat "spa')
         self.shell.send('\r')
         self.assertIn('space', self.shell.buffer())
-        self.assertFalse(sentinel.exists())
 
     def test_ambiguous_cycle_escape_restores_original_cursor(self):
         (self.home / 'ChoiceOne').mkdir()
