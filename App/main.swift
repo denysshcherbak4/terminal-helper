@@ -123,7 +123,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let script = Bundle.main.url(forResource: operation, withExtension: "zsh", subdirectory: "Integration") else {
             report("Integration unavailable", detail: "Reinstall this app from a complete build."); return
         }
-        let process = Process(); process.executableURL = URL(fileURLWithPath: "/bin/zsh"); process.arguments = [script.path]
+        let process = Process(); process.executableURL = URL(fileURLWithPath: "/bin/zsh"); process.arguments = ["-f", script.path]
         // Installer output may include private paths; never forward it into app logs.
         process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         process.environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": ProcessInfo.processInfo.environment["ZDOTDIR"] ?? FileManager.default.homeDirectoryForCurrentUser.path]
