@@ -36,9 +36,12 @@ jobs:
           python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
           if test -f Tests/Shell/test_install.py; then python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt; fi
       - name: Build universal app
+        if: always()
         run: bash Scripts/build.sh
       - name: App state tests
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test | tee results/app-tests.txt'
+      - name: Completion timing
+        run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json
       - name: Performance and native smoke test
         run: python3 Tests/Performance/measure.py
       - name: Package test build
