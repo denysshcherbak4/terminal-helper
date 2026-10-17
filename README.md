@@ -41,13 +41,13 @@ The shared switch is checked at completion and acceptance boundaries, including 
 
 Install/repair adds one clearly marked block to `.zshrc` and copies the bundled integration to the private `~/Library/Application Support/Terminal Helper` directory. Existing configuration is backed up before edits. Repeated installation does not duplicate the block. The installer honors the ZDOTDIR visible to its process and refuses unsafe targets.
 
-**Important:** Finder-launched apps may not inherit a shell's ZDOTDIR. For a custom ZDOTDIR, invoke the bundled installer explicitly from that configured shell:
+Settings asks you to select the folder containing your `.zshrc` (your home folder, or your custom `ZDOTDIR`). Choose the same folder for uninstall. This avoids assuming a Finder-launched app inherits shell environment. You can also invoke the bundled installer explicitly from your configured shell:
 
 ```zsh
 /bin/zsh -f "/Applications/Terminal Helper.app/Contents/Resources/Integration/install.zsh"
 ```
 
-Use Settings → Uninstall shell integration, then restart open shells. It disables assistance, removes only the owned configuration block and integration, and retains the private Off state so existing shells remain inert. After all integrated shells close, you may delete the app and its private support folder. Backups next to your shell configuration remain yours to keep or restore. A partial/edited managed block is rejected; inspect your backup rather than overwriting configuration.
+Use Settings → Uninstall shell integration, then restart open shells. It disables assistance, removes only the owned configuration block and integration, and removes its state. Missing state keeps existing shells inert. After all integrated shells close, you may delete the app and any remaining private support folder. Backups next to your shell configuration remain yours to keep or restore. A partial/edited managed block is rejected; inspect your backup rather than overwriting configuration.
 
 ## Limits and performance
 
