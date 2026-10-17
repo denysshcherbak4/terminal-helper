@@ -15,15 +15,16 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Shell:
-    def __init__(self, home, integrated=True, custom_enter=False, enter_macro=False):
+    def __init__(self, home, integrated=True, custom_enter=False, enter_macro=False, initialize_completion=True):
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
                    'TERM': 'xterm-256color', 'LC_ALL': 'en_US.UTF-8'}
             os.execve('/bin/zsh', ['zsh', '-f'], env)
         self.read()
+        completion_setup = "autoload -Uz compinit; compinit -D; " if initialize_completion else ""
         self.send("PROMPT='TH> '; RPROMPT=''; setopt no_beep; bindkey -e; "
-                  "autoload -Uz compinit; compinit -D; "
+                  + completion_setup +
                   "function dump_buffer() { print -r --; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
                   "zle -N dump_buffer; bindkey '^]' dump_buffer; print -r -- TH'_'READY\n")
         self.wait_for('TH_READY\r\n')
@@ -351,7 +352,7 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('cd ~/Doc', self.shell.buffer())
 
 
-def benchmark(repetitions=30):
+def benchmark(repetitions=30, initialize_completion=True):
     """Measure actual useful insertion in a PTY, excluding fixture/shell setup."""
     with tempfile.TemporaryDirectory() as tmp:
         home = Path(tmp)
@@ -363,12 +364,17 @@ def benchmark(repetitions=30):
         for index in range(255):
             (home / ('dataset_%03d.csv' % index)).touch()
         (home / 'perf-target-final.csv').touch()
-        shell = Shell(home)
+        shell = Shell(home, initialize_completion=initialize_completion)
         shell.send('cd ' + str(home) + '\n')
         shell.read()
         results = []
         try:
-            for _ in range(repetitions):
+            for iteration in range(repetitions):
+                if iteration and not initialize_completion:
+                    shell.close()
+                    shell = Shell(home, initialize_completion=False)
+                    shell.send('cd ' + str(home) + '\n')
+                    shell.read()
                 shell.send('\x15cat perf-target-fina')
                 shell.read(0.03)
                 start = time.perf_counter()
@@ -387,6 +393,13 @@ def benchmark(repetitions=30):
                 shell.read(0.03)
         finally:
             shell.close()
+        if not initialize_completion:
+            ordered = sorted(results)
+            return {'method': 'Fresh PTY shell without compinit: Tab through initialization to visible filename insertion; OS caches not flushed',
+                    'fixture_entries': 256, 'repetitions': repetitions,
+                    'first_observation_ms': results[0],
+                    'fresh_shell_p95_ms': ordered[min(len(ordered)-1, int(len(ordered)*.95))],
+                    'all_ms': results}
         ordered = sorted(results[1:])
         return {'method': 'PTY Tab to visible unique filename insertion',
                 'fixture_entries': 256, 'repetitions': repetitions,
@@ -396,7 +409,9 @@ def benchmark(repetitions=30):
 
 if __name__ == '__main__':
     import sys
-    if '--benchmark' in sys.argv:
+    if '--benchmark-uninitialized' in sys.argv:
+        print(json.dumps(benchmark(initialize_completion=False), indent=2))
+    elif '--benchmark' in sys.argv:
         print(json.dumps(benchmark(), indent=2))
     else:
         unittest.main(verbosity=2)
