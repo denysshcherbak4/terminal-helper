@@ -113,6 +113,7 @@ zle -N _th_cancel
 zle -C _th_completion complete-word _th_completion
 # Tab is the explicit opt-in binding; Enter delegates unchanged when idle.
 bindkey '^I' _th_tab
+bindkey '^[' _th_cancel
 zle -N accept-line _th_accept
 zmodload zsh/complist
 bindkey -M menuselect '^M' _th_accept
