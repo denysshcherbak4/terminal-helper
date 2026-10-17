@@ -7,8 +7,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: terminal-helper-${{ github.ref }}
+  group: terminal-helper-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
 jobs:
   validate:
     strategy:
@@ -36,15 +39,23 @@ jobs:
           python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
           if test -f Tests/Shell/test_install.py; then python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt; fi
       - name: Build universal app
+        id: build
         if: always()
         run: bash Scripts/build.sh
       - name: App state tests
+        if: always() && steps.build.outcome == 'success'
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test | tee results/app-tests.txt'
+      - name: Controller lifecycle test
+        if: always() && steps.build.outcome == 'success'
+        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test | tee results/lifecycle-tests.txt'
       - name: Completion timing
+        if: always()
         run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json
       - name: Performance and native smoke test
+        if: always() && steps.build.outcome == 'success'
         run: python3 Tests/Performance/measure.py
       - name: Package test build
+        if: always() && steps.build.outcome == 'success'
         run: |
           version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'dist/Terminal Helper.app/Contents/Info.plist')
           ditto -c -k --sequesterRsrc --keepParent 'dist/Terminal Helper.app' "dist/Terminal-Helper-${version}-${GITHUB_SHA:0:12}-universal.zip"
