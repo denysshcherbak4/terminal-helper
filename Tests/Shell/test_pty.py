@@ -170,5 +170,93 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('NORMAL_ENTER', self.shell.read())
 
 
+    def test_no_match_keeps_normal_enter(self):
+        self.complete('print MISSING_COMPLETION_xyz123')
+        self.shell.send('\r')
+        out = self.shell.read()
+        self.assertIn('\r\nMISSING_COMPLETION_xyz123\r\n', out)
+
+    def test_cursor_middle_preserves_suffix(self):
+        self.shell.send('cat not tail' + '\x1b[D' * 5 + '\t')
+        self.shell.read(0.8)
+        self.shell.send('\r')
+        out = self.shell.buffer()
+        self.assertIn('notebook.ipynb', out)
+        self.assertIn(' tail', out)
+
+    def test_multiple_shells_observe_same_state(self):
+        second = Shell(self.home)
+        try:
+            self.state(False)
+            for shell in (self.shell, second):
+                shell.send('cd ~/Doc\t')
+                shell.read()
+                self.assertIn('cd ~/Doc', shell.buffer())
+        finally:
+            second.close()
+
+    def test_state_permissions_and_symlink_rejected(self):
+        target = self.base / 'state'
+        target.chmod(0o644)
+        self.complete('cd ~/Doc')
+        self.assertIn('cd ~/Doc', self.shell.buffer())
+        self.shell.send('\x15')
+        target.unlink()
+        elsewhere = self.home / 'elsewhere'
+        elsewhere.write_text('terminal-helper-v1:on\n')
+        elsewhere.chmod(0o600)
+        target.symlink_to(elsewhere)
+        self.complete('cd ~/Doc')
+        self.assertIn('cd ~/Doc', self.shell.buffer())
+
+
+def benchmark(repetitions=30):
+    """Measure actual useful insertion in a PTY, excluding fixture/shell setup."""
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        base = home / 'Library/Application Support/Terminal Helper'
+        base.mkdir(parents=True, mode=0o700)
+        state = base / 'state'
+        state.write_text('terminal-helper-v1:on\n')
+        state.chmod(0o600)
+        for index in range(255):
+            (home / ('dataset_%03d.csv' % index)).touch()
+        (home / 'perf-target-final.csv').touch()
+        shell = Shell(home)
+        shell.send('cd ' + str(home) + '\n')
+        shell.read()
+        results = []
+        try:
+            for _ in range(repetitions):
+                shell.send('\x15cat perf-target-fina')
+                shell.read(0.03)
+                start = time.perf_counter()
+                shell.send('\t')
+                data = b''
+                deadline = start + 5
+                while b'l.csv' not in data:
+                    remaining = deadline - time.perf_counter()
+                    if remaining <= 0:
+                        raise AssertionError('No useful completion appeared within five seconds')
+                    ready, _, _ = select.select([shell.fd], [], [], remaining)
+                    if ready:
+                        data += os.read(shell.fd, 65536)
+                results.append((time.perf_counter() - start) * 1000)
+                shell.send('\r\x15')
+                shell.read(0.03)
+        finally:
+            shell.close()
+        ordered = sorted(results[1:])
+        return {'method': 'PTY Tab to visible unique filename insertion',
+                'fixture_entries': 256, 'repetitions': repetitions,
+                'first_ms': results[0], 'warm_p95_ms': ordered[min(len(ordered)-1, int(len(ordered)*.95))],
+                'all_ms': results}
+
+
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    import sys
+    if '--benchmark' in sys.argv:
+        print(json.dumps(benchmark(), indent=2))
+    else:
+        unittest.main(verbosity=2)
+
