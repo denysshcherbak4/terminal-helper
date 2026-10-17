@@ -88,11 +88,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let title = NSTextField(labelWithString: "Helpful terminal suggestions")
             title.font = .systemFont(ofSize: 17, weight: .semibold); stack.addArrangedSubview(title)
             let label = NSTextField(wrappingLabelWithString: "Suggestions: Off\nShell integration: not installed")
-            label.font = .systemFont(ofSize: 13); stack.addArrangedSubview(label); settingsStatus = label
+            label.font = .systemFont(ofSize: 13); stack.addArrangedSubview(label); label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true; settingsStatus = label
             let button = NSButton(checkboxWithTitle: "Enable suggestions", target: self, action: #selector(changeEnabled))
             button.setAccessibilityLabel("Enable suggestions"); stack.addArrangedSubview(button); settingsToggle = button
             let info = NSTextField(wrappingLabelWithString: "Use Tab in an integrated interactive zsh. Off takes effect at the next completion or acceptance. The menu-bar app stays resident while Off.")
             info.font = .systemFont(ofSize: 13); stack.addArrangedSubview(info)
+            info.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
             let install = NSButton(title: "Install or repair shell integration…", target: self, action: #selector(installIntegration))
             stack.addArrangedSubview(install)
             let uninstall = NSButton(title: "Uninstall shell integration…", target: self, action: #selector(uninstallIntegration))
