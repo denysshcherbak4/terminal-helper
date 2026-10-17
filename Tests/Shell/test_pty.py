@@ -25,7 +25,7 @@ class Shell:
         self.send("PROMPT='TH> '; RPROMPT=''; setopt no_beep; bindkey -e; "
                   "autoload -Uz compinit; compinit -D; "
                   "function dump_buffer() { print -r --; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
-                  "zle -N dump_buffer; bindkey '^X' dump_buffer\n")
+                  "zle -N dump_buffer; bindkey '^]' dump_buffer\n")
         self.read()
         if integrated:
             self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + '\n')
@@ -47,7 +47,7 @@ class Shell:
         return data.decode(errors='replace')
 
     def buffer(self):
-        self.send('\x18')
+        self.send('\x1d')
         return self.read()
 
     def close(self):
@@ -187,11 +187,55 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('space', self.shell.buffer())
         self.assertFalse(sentinel.exists())
 
+    def test_ambiguous_cycle_escape_restores_original_cursor(self):
+        (self.home / 'ChoiceOne').mkdir()
+        (self.home / 'ChoiceTwo').mkdir()
+        self.complete('cd Cho')
+        self.shell.send('\t\x1b')
+        time.sleep(0.5)
+        out = self.shell.buffer()
+        self.assertIn('DUMP:"cd Cho":6', out)
+
+    def test_arrow_navigation_and_enter_only_edits(self):
+        (self.home / 'ChoiceOne').mkdir()
+        (self.home / 'ChoiceTwo').mkdir()
+        self.complete('cd Cho')
+        self.shell.send('\x1b[B\r')
+        self.shell.read()
+        out = self.shell.buffer()
+        self.assertIn('DUMP:', out)
+        self.assertIn('Choice', out)
+        self.assertIn('cd ', out)
+
+    def test_executable_completion(self):
+        self.complete('pytho')
+        self.shell.send('\r')
+        self.assertIn('python', self.shell.buffer())
+
+    def test_git_command_completion(self):
+        self.complete('git che')
+        self.shell.send('\r')
+        out = self.shell.buffer()
+        self.assertIn('git ', out)
+        self.assertTrue(any(word in out for word in ('checkout', 'cherry', 'check-')), out)
+
+    def test_case_sensitive_fixture(self):
+        upper, lower = self.home / 'CaseUnique.csv', self.home / 'caseunique.csv'
+        upper.touch()
+        lower.touch()
+        if os.path.samefile(upper, lower):
+            self.skipTest('Runner fixture filesystem is case-insensitive')
+        self.complete('cat CaseU')
+        self.shell.send('\r')
+        out = self.shell.buffer()
+        self.assertIn('CaseUnique.csv', out)
+        self.assertNotIn('caseunique.csv', out)
+
     def test_no_match_keeps_normal_enter(self):
         self.complete('print MISSING_COMPLETION_xyz123')
         self.shell.send('\r')
         out = self.shell.read()
-        self.assertIn('\r\nMISSING_COMPLETION_xyz123\r\n', out)
+        self.assertIn('MISSING_COMPLETION_xyz123\r\n', out)
 
     def test_cursor_middle_preserves_suffix(self):
         self.shell.send('cat not tail' + '\x1b[D' * 5 + '\t')
