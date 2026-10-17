@@ -25,8 +25,8 @@ class Shell:
         self.send("PROMPT='TH> '; RPROMPT=''; setopt no_beep; bindkey -e; "
                   "autoload -Uz compinit; compinit -D; "
                   "function dump_buffer() { print -r --; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
-                  "zle -N dump_buffer; bindkey '^]' dump_buffer\n")
-        self.read()
+                  "zle -N dump_buffer; bindkey '^]' dump_buffer; print -r -- TH'_'READY\n")
+        self.wait_for('TH_READY\r\n')
         if custom_enter:
             self.send("function custom_enter() { print CUSTOM_ENTER_CALLED; zle .accept-line; }; zle -N custom_enter; bindkey '^M' custom_enter\n")
             self.read()
@@ -34,8 +34,19 @@ class Shell:
             self.send("bindkey -s '^M' 'MACRO_LITERAL'\n")
             self.read()
         if integrated:
-            self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + '\n')
-            self.read()
+            self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + "; print -r -- TH'_'SOURCED\n")
+            self.wait_for('TH_SOURCED\r\n')
+
+    def wait_for(self, marker, timeout=15):
+        data = ''
+        deadline = time.monotonic() + timeout
+        while marker not in data:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AssertionError('Interactive shell did not reach readiness marker')
+            data += self.read(min(0.1, remaining))
+        self.read(0.03)
+        return data
 
     def send(self, data):
         os.write(self.fd, data.encode())
