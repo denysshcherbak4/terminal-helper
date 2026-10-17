@@ -100,7 +100,7 @@ class CompletionTests(unittest.TestCase):
     def test_typo(self):
         self.complete('cd ' + str(self.home) + '/dents')
         self.shell.send('\r')
-        self.assertIn('/denys', self.shell.buffer())
+        self.assertIn(str(self.home) + '/denys', self.shell.buffer())
 
     def test_escape_restores_buffer(self):
         self.complete('cd ~/Doc')
@@ -134,11 +134,14 @@ class CompletionTests(unittest.TestCase):
         self.assertFalse(sentinel.exists())
 
     def test_multiline_unsupported(self):
-        self.shell.send("BUFFER=$'echo first\\necho second'; CURSOR=${#BUFFER}\n")
+        self.shell.send("function multiline_buffer() { BUFFER=$'echo first\\necho second'; CURSOR=${#BUFFER}; }; zle -N multiline_buffer; bindkey '^Y' multiline_buffer\n")
         self.shell.read()
-        # Pasted text is not passed through eval or a command reconstruction layer.
-        self.complete("echo 'unterminated")
-        self.assertIn('unterminated', self.shell.buffer())
+        self.shell.send('\x19\t')
+        self.shell.read()
+        out = self.shell.buffer()
+        self.assertIn('echo first', out)
+        self.assertIn('echo second', out)
+        self.assertNotIn('\r\nsecond\r\n', out)
 
     def test_file_spaces_unicode_symlink(self):
         for text, expected in [('cat spa', 'space'), ('cat дан', 'дані'), ('cd lin', 'link')]:
@@ -169,6 +172,20 @@ class CompletionTests(unittest.TestCase):
         self.shell.send('print NORMAL_ENTER\r')
         self.assertIn('NORMAL_ENTER', self.shell.read())
 
+
+    def test_unrelated_keybinding_preserved(self):
+        self.shell.send("function custom_key() { BUFFER='CUSTOM_KEY_PRESERVED'; CURSOR=${#BUFFER}; }; zle -N custom_key; bindkey '^K' custom_key\n")
+        self.shell.read()
+        self.shell.send('\x0b')
+        self.assertIn('CUSTOM_KEY_PRESERVED', self.shell.buffer())
+
+    def test_quoted_path_and_hostile_filename_are_literal(self):
+        sentinel = self.home / 'SHOULD_NOT_EXIST'
+        (self.home / '$(touch SHOULD_NOT_EXIST).csv').touch()
+        self.complete('cat "spa')
+        self.shell.send('\r')
+        self.assertIn('space', self.shell.buffer())
+        self.assertFalse(sentinel.exists())
 
     def test_no_match_keeps_normal_enter(self):
         self.complete('print MISSING_COMPLETION_xyz123')
