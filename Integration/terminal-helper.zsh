@@ -71,7 +71,11 @@ _th_tab() {
 _th_completion() {
   local MENUSELECT=1 LISTMAX=20
   _main_complete _complete _th_correct
-  compstate[insert]=menu
+  if (( compstate[nmatches] )); then
+    compstate[insert]=menu
+  else
+    _TH_ACTIVE=0
+  fi
 }
 
 _th_accept() {
