@@ -30,7 +30,7 @@ _th_supported() {
 _th_correct() {
   setopt localoptions extendedglob nullglob
   local token=$PREFIX parent leaf candidate insert_parent=
-  [[ -n "$token" ]] || return 1
+  [[ -n "$token" && -z "$SUFFIX" ]] || return 1
   (( CURRENT > 1 )) || [[ "$token" == */* ]] || return 1
   [[ -e "$token" || -L "$token" ]] && return 1
   if [[ "$token" == */* ]]; then
@@ -43,6 +43,7 @@ _th_correct() {
   fi
   [[ "$parent" == '~' ]] && parent=$HOME
   [[ "$parent" == '~/'* ]] && parent="$HOME/${parent#\~/}"
+  [[ -e "$parent/$leaf" || -L "$parent/$leaf" ]] && return 1
   [[ -d "$parent" && ${#leaf} -ge 3 && ${#leaf} -le 128 ]] || return 1
   # Short-circuit enumeration after 257 entries; native command completions have their own limits.
   local -a entries candidates
@@ -143,15 +144,17 @@ _th_menu_accept() {
   return 0
 }
 
-zle -A accept-line _th_original_accept
+# Key macros cannot be safely delegated as widgets; leave this shell unchanged.
 typeset _th_return_binding=${${(z)$(bindkey '^M')}[-1]}
 typeset _th_newline_binding=${${(z)$(bindkey '^J')}[-1]}
+typeset _th_escape_binding=${${(z)$(bindkey '^[')}[-1]}
+(( ${+widgets[$_th_return_binding]} && ${+widgets[$_th_newline_binding]} && ${+widgets[$_th_escape_binding]} )) || return 0
+zle -A accept-line _th_original_accept
 zle -A "$_th_return_binding" _th_original_return
 zle -A "$_th_newline_binding" _th_original_newline
-unset _th_return_binding _th_newline_binding
-typeset _th_escape_binding=${${(z)$(bindkey '^[')}[-1]}
-[[ -z $_th_escape_binding || $_th_escape_binding == undefined-key ]] || zle -A "$_th_escape_binding" _th_original_escape
-unset _th_escape_binding
+zle -A "$_th_escape_binding" _th_original_escape
+unset _th_return_binding _th_newline_binding _th_escape_binding
+
 zle -N _th_tab
 zle -N _th_return
 zle -N _th_newline
