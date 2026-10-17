@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Shell:
-    def __init__(self, home, integrated=True):
+    def __init__(self, home, integrated=True, custom_enter=False):
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
@@ -27,6 +27,9 @@ class Shell:
                   "function dump_buffer() { print -r --; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
                   "zle -N dump_buffer; bindkey '^]' dump_buffer\n")
         self.read()
+        if custom_enter:
+            self.send("function custom_enter() { print CUSTOM_ENTER_CALLED; zle .accept-line; }; zle -N custom_enter; bindkey '^M' custom_enter\n")
+            self.read()
         if integrated:
             self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + '\n')
             self.read()
@@ -172,6 +175,21 @@ class CompletionTests(unittest.TestCase):
         self.shell.send('print NORMAL_ENTER\r')
         self.assertIn('NORMAL_ENTER', self.shell.read())
 
+
+    def test_custom_enter_guarded_and_idle_delegates(self):
+        self.shell.close()
+        self.shell = Shell(self.home, custom_enter=True)
+        self.shell.send('cd ' + str(self.home) + '\r')
+        self.shell.read()
+        self.complete('cat note')
+        self.shell.send('\r')
+        out = self.shell.buffer()
+        self.assertIn('notebook.ipynb', out)
+        self.assertNotIn('CUSTOM_ENTER_CALLED', out)
+        self.shell.send('\x15print IDLE_ENTER_WORKS\r')
+        out = self.shell.read()
+        self.assertIn('CUSTOM_ENTER_CALLED', out)
+        self.assertIn('IDLE_ENTER_WORKS\r\n', out)
 
     def test_unrelated_keybinding_preserved(self):
         self.shell.send("function custom_key() { BUFFER='CUSTOM_KEY_PRESERVED'; CURSOR=${#BUFFER}; }; zle -N custom_key; bindkey '^K' custom_key\n")
