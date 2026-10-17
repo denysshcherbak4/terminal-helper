@@ -127,6 +127,14 @@ _th_redraw() {
   fi
 }
 
+_th_return() {
+  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle _th_original_return; fi
+}
+
+_th_newline() {
+  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle _th_original_newline; fi
+}
+
 _th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; }
 
 _th_menu_accept() {
@@ -136,16 +144,25 @@ _th_menu_accept() {
 }
 
 zle -A accept-line _th_original_accept
+typeset _th_return_binding=${${(z)$(bindkey '^M')}[-1]}
+typeset _th_newline_binding=${${(z)$(bindkey '^J')}[-1]}
+zle -A "$_th_return_binding" _th_original_return
+zle -A "$_th_newline_binding" _th_original_newline
+unset _th_return_binding _th_newline_binding
 typeset _th_escape_binding=${${(z)$(bindkey '^[')}[-1]}
 [[ -z $_th_escape_binding || $_th_escape_binding == undefined-key ]] || zle -A "$_th_escape_binding" _th_original_escape
 unset _th_escape_binding
 zle -N _th_tab
+zle -N _th_return
+zle -N _th_newline
 zle -N _th_accept
 zle -N _th_menu_accept
 zle -N _th_cancel
 zle -C _th_completion complete-word _th_completion
 # Tab is the explicit opt-in binding; Enter delegates unchanged when idle.
 bindkey '^I' _th_tab
+bindkey '^M' _th_return
+bindkey '^J' _th_newline
 bindkey '^[' _th_cancel
 zle -N accept-line _th_accept
 zmodload zsh/complist
