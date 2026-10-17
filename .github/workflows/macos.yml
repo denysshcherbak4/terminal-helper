@@ -1,0 +1,62 @@
+name: macOS MVP
+on:
+  push:
+    branches: [main, feature/terminal-helper-mvp]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: terminal-helper-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Environment
+        run: |
+          mkdir -p results dist
+          sw_vers > results/environment.txt
+          uname -m >> results/environment.txt
+          sysctl -n machdep.cpu.brand_string >> results/environment.txt
+          /bin/zsh --version >> results/environment.txt
+          swift --version >> results/environment.txt
+      - name: Shell syntax
+        run: find Integration -name '*.zsh' -exec /bin/zsh -n {} \;
+      - name: ZLE and installer tests
+        run: |
+          python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
+          if test -f Tests/Shell/test_install.py; then python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt; fi
+      - name: Build universal app
+        run: bash Scripts/build.sh
+      - name: App state tests
+        run: '"dist/Terminal Helper.app/Contents/MacOS/Terminal Helper" --self-test | tee results/app-tests.txt'
+      - name: Performance and native smoke test
+        run: python3 Tests/Performance/measure.py
+      - name: Package test build
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'dist/Terminal Helper.app/Contents/Info.plist')
+          ditto -c -k --sequesterRsrc --keepParent 'dist/Terminal Helper.app' "dist/Terminal-Helper-${version}-${GITHUB_SHA:0:12}-universal.zip"
+          cd dist
+          shasum -a 256 *.zip > SHA256SUMS.txt
+          du -sh 'Terminal Helper.app' >> ../results/environment.txt
+          lipo -archs 'Terminal Helper.app/Contents/MacOS/Terminal Helper' >> ../results/environment.txt
+          codesign -dv 'Terminal Helper.app' 2>> ../results/environment.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Terminal-Helper-${{ matrix.runner }}-${{ github.sha }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            results/
+          if-no-files-found: error
+          retention-days: 14
