@@ -50,6 +50,8 @@ _th_correct() {
   entries=("$parent"/*(NDY257))
   (( ${#entries} <= 256 )) || return 1
   for candidate in "$entries[@]"; do
+    # A bare leading dash would become a command option, even when shell-quoted.
+    [[ -z "$insert_parent" && "${candidate:t}" == -* ]] && continue
     [[ "${candidate:t}" == *[[:cntrl:]]* ]] && continue
     [[ "${words[1]}" == cd && ! -d "$candidate" ]] && continue
     [[ "${candidate:t}" == (#a1)"$leaf" ]] || continue
