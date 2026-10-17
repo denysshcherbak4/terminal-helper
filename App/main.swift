@@ -1,7 +1,14 @@
 import AppKit
 
 final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private let state = SuggestionState()
+    private let state: SuggestionState
+    private let lifecycleRoot: URL?
+    private var quitting = false
+    init(lifecycleRoot: URL? = nil) {
+        self.lifecycleRoot = lifecycleRoot
+        self.state = lifecycleRoot.map { SuggestionState(parent: $0) } ?? SuggestionState()
+        super.init()
+    }
     private var item: NSStatusItem!
     private let menu = NSMenu()
     private let status = NSMenuItem(title: "Suggestions: Off", action: nil, keyEquivalent: "")
@@ -34,6 +41,9 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add("Disable and Quit", action: #selector(disableAndQuit), key: "q")
         item.menu = menu
         refresh()
+        if lifecycleRoot != nil {
+            DispatchQueue.main.async { self.lifecycleTest() }
+        }
         if CommandLine.arguments.contains("--smoke-test") { showSettings() }
         if let position = CommandLine.arguments.firstIndex(where: { $0 == "--ui-smoke-test" || $0 == "--render-preview" }), position + 1 < CommandLine.arguments.count {
             showSettings()
@@ -71,11 +81,33 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do { try state.write(enabled: !state.enabled()); refresh() }
         catch { report("Could not change suggestions", detail: String(describing: error)) }
     }
+    private func lifecycleTest() {
+        guard !state.enabled() else { exit(1) }
+        changeEnabled()
+        guard state.enabled(), toggle.state == .on else { exit(1) }
+        changeEnabled()
+        guard !state.enabled(), toggle.state == .off else { exit(1) }
+        changeEnabled()
+        guard state.enabled(), toggle.state == .on else { exit(1) }
+        disableAndQuit()
+    }
     @objc private func disableAndQuit() {
+        guard !quitting else { return }
         do {
             try state.write(enabled: false)
-            worker?.terminate()
-            NSApp.terminate(nil)
+            if let root = lifecycleRoot {
+                guard !state.enabled() else { exit(1) }
+                try FileManager.default.removeItem(at: root)
+                print("PASS controller lifecycle: On, Off, re-enable, Disable and Quit writes Off")
+            }
+            quitting = true
+            if let process = worker, process.isRunning {
+                process.terminate()
+                // Escalate only an explicit quit; idle Off has no timers or polling.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+                }
+            } else { NSApp.terminate(nil) }
         } catch { report("Could not disable safely", detail: "Terminal Helper will stay open. " + String(describing: error)) }
     }
     @objc private func showSettings() {
@@ -140,7 +172,9 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         worker = process
         process.terminationHandler = { completed in
             DispatchQueue.main.async {
-                self.worker = nil; self.refresh()
+                self.worker = nil
+                if self.quitting { NSApp.terminate(nil); return }
+                self.refresh()
                 self.report(completed.terminationStatus == 0 ? "Shell integration updated" : "Shell integration could not be updated", detail: completed.terminationStatus == 0 ? "Open a new terminal shell to use the updated configuration." : "Check that your shell configuration and Terminal Helper folder belong to you and are writable. See the troubleshooting guide; no configuration is overwritten.")
             }
         }
@@ -152,6 +186,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try stateSelfTest(); exit(0) } catch { fputs("\(error)\n", stderr); exit(1) }
 }
 let application = NSApplication.shared
-let controller = Controller()
+let lifecycleRoot = CommandLine.arguments.contains("--lifecycle-test") ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
+let controller = Controller(lifecycleRoot: lifecycleRoot)
 application.delegate = controller
 application.run()
