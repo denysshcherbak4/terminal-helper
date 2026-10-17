@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Shell:
-    def __init__(self, home, integrated=True, custom_enter=False):
+    def __init__(self, home, integrated=True, custom_enter=False, enter_macro=False):
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
@@ -29,6 +29,9 @@ class Shell:
         self.read()
         if custom_enter:
             self.send("function custom_enter() { print CUSTOM_ENTER_CALLED; zle .accept-line; }; zle -N custom_enter; bindkey '^M' custom_enter\n")
+            self.read()
+        if enter_macro:
+            self.send("bindkey -s '^M' 'MACRO_LITERAL'\n")
             self.read()
         if integrated:
             self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + '\n')
@@ -175,6 +178,20 @@ class CompletionTests(unittest.TestCase):
         self.shell.send('print NORMAL_ENTER\r')
         self.assertIn('NORMAL_ENTER', self.shell.read())
 
+
+    def test_key_macro_refuses_integration_without_changing_binding(self):
+        self.shell.close()
+        self.shell = Shell(self.home, enter_macro=True)
+        self.shell.send('\r')
+        out = self.shell.buffer()
+        self.assertIn('MACRO_LITERAL', out)
+
+    def test_existing_tilde_file_not_replaced_by_similar_directory(self):
+        (self.home / 'data').touch()
+        (self.home / 'date').mkdir()
+        self.complete('cd ~/data')
+        self.assertIn('cd ~/data', self.shell.buffer())
+        self.assertNotIn('~/date', self.shell.buffer())
 
     def test_custom_enter_guarded_and_idle_delegates(self):
         self.shell.close()
