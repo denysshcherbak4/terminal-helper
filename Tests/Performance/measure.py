@@ -51,10 +51,13 @@ try:
     time.sleep(2)
     assert process.poll() is None, "Controller exited before idle measurement"
     for _ in range(6):
-        row = subprocess.check_output(["/bin/ps", "-o", "rss=,%cpu=", "-p", str(process.pid)], text=True).split()
+        row = subprocess.check_output(["/bin/ps", "-o", "rss=,%cpu=,time=", "-p", str(process.pid)], text=True).split()
+        minutes, seconds = row[2].split(":")
+        cpu_seconds = int(minutes) * 60 + float(seconds)
         children = subprocess.run(["/usr/bin/pgrep", "-P", str(process.pid)], capture_output=True, text=True)
         samples.append({"rss_kib": int(row[0]), "cpu_percent": float(row[1]),
-                        "direct_child_count": len(children.stdout.splitlines())})
+                        "direct_child_count": len(children.stdout.splitlines()),
+                        "cpu_seconds": cpu_seconds, "elapsed_seconds": time.monotonic()})
         time.sleep(1)
 finally:
     process.terminate()
@@ -70,6 +73,7 @@ report = {
                        "samples": samples, "process_count": 1,
                        "rss_median_kib": statistics.median(s["rss_kib"] for s in samples),
                        "cpu_max_percent": max(s["cpu_percent"] for s in samples),
+                       "idle_interval_cpu_percent": 100 * (samples[-1]["cpu_seconds"] - samples[0]["cpu_seconds"]) / (samples[-1]["elapsed_seconds"] - samples[0]["elapsed_seconds"]),
                        "owned_children_max": max(s["direct_child_count"] for s in samples)},
     "app_bytes": sum(p.stat().st_size for p in app.parents[2].rglob("*") if p.is_file()),
     "limits": ["No forced disk-cache flush; first observation is not a guaranteed cold filesystem.",
