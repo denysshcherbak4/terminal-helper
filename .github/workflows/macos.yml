@@ -37,11 +37,13 @@ jobs:
           swift --version >> results/environment.txt
       - name: Shell syntax
         run: for script in Integration/*.zsh; do /bin/zsh -n "$script"; done
-      - name: ZLE and installer tests
-        run: |
-          python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
-          if test -f Tests/Shell/test_install.py; then python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt; fi
+      - name: Installer tests
+        run: python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt
+      - name: ZLE tests
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
       - name: Case-sensitive filesystem
+        if: always() && !cancelled()
         run: |
           case_root=$(mktemp -d "$RUNNER_TEMP/terminal-helper-case.XXXXXX")
           case_mount="$case_root/mount"
@@ -56,6 +58,7 @@ jobs:
           mkdir "$case_mount/tmp"
           TMPDIR="$case_mount/tmp" python3 Tests/Shell/test_pty.py CompletionTests.test_case_sensitive_fixture 2>&1 | tee results/case-sensitive-tests.txt
       - name: Terminal.app interaction smoke
+        if: always() && !cancelled()
         run: python3 Tests/Shell/test_terminal.py | tee results/terminal-native.json
       - name: Build universal app
         id: build
