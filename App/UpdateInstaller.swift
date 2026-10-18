@@ -7,8 +7,35 @@ struct UpdateInstallation {
     let relaunched: Bool
 }
 
+final class UpdateCancellation {
+    private let lock = NSLock()
+    private var value = false
+    private var sources: [DispatchSourceSignal] = []
+    var cancelled: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    init() {
+        for number in [SIGTERM, SIGINT] {
+            signal(number, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .global())
+            source.setEventHandler { [weak self] in
+                guard let self else { return }
+                self.lock.lock(); self.value = true; self.lock.unlock()
+            }
+            source.resume(); sources.append(source)
+        }
+    }
+    func close() {
+        for source in sources { source.cancel() }
+        for number in [SIGTERM, SIGINT] { signal(number, SIG_DFL) }
+    }
+    func check() throws {
+        if cancelled { throw UpdateFailure.invalid("Update cancelled. Suggestions remain Off; any completed installation can be recovered from its retained backup.") }
+    }
+}
+
 // Runs only for an explicit update. No downloaded executable or script is invoked directly.
 enum UpdateInstaller {
+    private static var cancellation: UpdateCancellation?
+    static private(set) var cancelledByUser = false
     static let bundleID = "io.github.denysshcherbak4.terminal-helper"
     static let manager = FileManager.default
 
@@ -18,10 +45,13 @@ enum UpdateInstaller {
         let done = DispatchSemaphore(value: 0)
         var result: Result<T, Error>?
         start { result = $0; done.signal() }
-        guard done.wait(timeout: .now() + 150) == .success, let result else {
-            throw fail("The update request timed out. Nothing was installed.")
+        let deadline = Date().addingTimeInterval(150)
+        while done.wait(timeout: .now() + 0.1) != .success {
+            try cancellation?.check()
+            guard Date() < deadline else { throw fail("The update request timed out. Nothing was installed.") }
         }
-        return try result.get()
+        try cancellation?.check()
+        return try result!.get()
     }
 
     static func info(_ url: URL) throws -> stat {
@@ -53,7 +83,7 @@ enum UpdateInstaller {
         }
     }
 
-    static func command(_ executable: String, _ arguments: [String], timeout: TimeInterval = 30) throws {
+    static func command(_ executable: String, _ arguments: [String], timeout: TimeInterval = 30, cancellable: Bool = true) throws {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable); task.arguments = arguments
         task.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": manager.homeDirectoryForCurrentUser.path]
@@ -62,11 +92,16 @@ enum UpdateInstaller {
         let done = DispatchSemaphore(value: 0)
         task.terminationHandler = { _ in done.signal() }
         try task.run()
-        if done.wait(timeout: .now() + timeout) != .success {
-            task.terminate()
-            if done.wait(timeout: .now() + 2) != .success { kill(task.processIdentifier, SIGKILL); task.waitUntilExit() }
-            throw fail("A macOS update operation timed out. The recovery copy was retained.")
+        let deadline = Date().addingTimeInterval(timeout)
+        while done.wait(timeout: .now() + 0.05) != .success {
+            if Date() >= deadline || (cancellable && cancellation?.cancelled == true) {
+                task.terminate()
+                if done.wait(timeout: .now() + 2) != .success { kill(task.processIdentifier, SIGKILL); task.waitUntilExit() }
+                try cancellation?.check()
+                throw fail("A macOS update operation timed out. The recovery copy was retained.")
+            }
         }
+        if cancellable { try cancellation?.check() }
         guard task.terminationStatus == 0 else {
             throw fail("macOS refused an update operation. Check app permissions and security approval; the recovery copy was retained if installation started.")
         }
@@ -251,6 +286,9 @@ enum UpdateInstaller {
     static func install(disk: URL, version: String, target: URL = Bundle.main.bundleURL,
                         fetch: @escaping TerminalUpdates.Fetch = BoundedRequest.fetch,
                         launch: (URL) -> Bool = { reopen($0, updated: true) }) throws -> UpdateInstallation {
+        let token = UpdateCancellation()
+        cancellation = token; cancelledByUser = false
+        defer { cancelledByUser = token.cancelled; cancellation = nil; token.close() }
         let home = manager.homeDirectoryForCurrentUser
         let applications = [home.appendingPathComponent("Applications"), URL(fileURLWithPath: "/Applications")]
         try targetAllowed(target, applications: applications)
@@ -278,7 +316,7 @@ enum UpdateInstaller {
         guard chmod(snapshot.path, 0o600) == 0 else { throw fail("Could not protect the verified disk image.") }
         var mounted = true
         defer {
-            if mounted { try? command("/usr/bin/hdiutil", ["detach", mount.path, "-quiet"]) }
+            if mounted { try? command("/usr/bin/hdiutil", ["detach", mount.path, "-quiet"], timeout: 10, cancellable: false) }
             try? manager.removeItem(at: snapshot)
         }
         try command("/usr/bin/hdiutil", ["attach", snapshot.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path, "-quiet"])
@@ -287,6 +325,7 @@ enum UpdateInstaller {
         let staged = workspace.appendingPathComponent("Terminal Helper.app")
         try manager.copyItem(at: candidate, to: staged)
         try validateBundle(staged, version: version)
+        try token.check()
         try quarantine(staged)
         try command("/usr/bin/hdiutil", ["detach", mount.path, "-quiet"])
         mounted = false
@@ -294,14 +333,15 @@ enum UpdateInstaller {
         let support = home.appendingPathComponent("Library/Application Support/Terminal Helper")
         try SuggestionState().write(enabled: false)
         try Data("Previous Terminal Helper app retained here. Disable and Quit before restoring it to the same Applications folder. Repair shell integration in Settings and restart shells afterward. Do not remove quarantine or change macOS security settings. See Docs/UPDATES.md in the repository.\n".utf8).write(to: workspace.appendingPathComponent("RECOVERY.txt"), options: .withoutOverwriting)
+        try token.check()
         do {
             try replace(staged: staged, target: target, version: version, support: support,
-                        applications: applications, stop: { try stopControllers(target: target) })
+                        applications: applications, stop: { try token.check(); try stopControllers(target: target); try token.check() })
             exchanged = true
         } catch {
             // Retain both copies if a recovery error left the target uncertain.
             if (try? bundleVersion(target)) != installedVersion || error.localizedDescription.contains("Automatic recovery") { exchanged = true }
-            _ = reopen(target)
+            if !token.cancelled { _ = reopen(target) }
             throw error
         }
         return UpdateInstallation(backup: staged, relaunched: launch(target))

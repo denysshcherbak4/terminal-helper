@@ -291,6 +291,7 @@ func updateCommandLine() -> Int32? {
             return 0
         } catch {
             fputs("\(error.localizedDescription)\n", stderr)
+            if UpdateInstaller.cancelledByUser { return 130 }
             let alert = NSAlert(); alert.messageText = "Update could not be completed"
             alert.informativeText = error.localizedDescription + " See the update recovery guide if a backup was retained."
             alert.addButton(withTitle: "OK"); NSApplication.shared.setActivationPolicy(.accessory)
