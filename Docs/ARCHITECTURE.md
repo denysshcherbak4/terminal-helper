@@ -30,4 +30,8 @@ Installation is an explicit action in Settings, not an app-launch side effect. T
 
 ## Distribution boundary
 
-CI runs on GitHub-hosted macOS and uploads a versioned universal test build and checksum. A successful compile or offscreen render does not establish a successful Terminal.app/VoiceOver user flow. Developer ID signing and notarization are separate release requirements. Do not disable Gatekeeper to run a test artifact.
+CI runs on GitHub-hosted macOS and uploads a versioned universal test build and checksum. A successful compile or offscreen render does not establish a successful Terminal.app/VoiceOver user flow. The free community beta is ad-hoc signed, without Developer ID/notarization. Apple’s per-app opening approval is a user decision; never globally disable Gatekeeper or strip quarantine.
+
+## Explicit updates
+
+App/Updates.swift performs fixed public-release checks, bounded HTTPS downloads, SHA-256 verification, private saving and quarantine. Only explicit menu/terminal actions make requests. The terminal command delegates to the installed app through private, non-executable app-path metadata, never evaluated or used to forward arbitrary arguments. A verified DMG opens for deliberate Finder replacement; no app self-installation occurs. See UPDATES.md and RELEASING.md.

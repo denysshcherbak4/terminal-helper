@@ -7,7 +7,9 @@ Use the exact source commit in each Actions artifact name. Only a successful com
 The MVP workflow runs on GitHub-hosted macOS 15 Apple Silicon and Intel, with contents-read permission, no persisted checkout credentials, pinned Actions, explicit pipefail, and a 20-minute timeout. All project checkouts, generated files, builds, disk fixtures and app execution occur on disposable remote runners.
 
 - Actual PTY/ZLE tests exercise files, directory typos, quoting, Unicode, control and malicious-looking filenames, ambiguous selection, Escape snapshots, acceptance without execution, custom keys, unsupported expressions, multiline and bracketed-paste input, cursor-middle edits, and state changes across multiple shells.
-- Installer tests cover repeat install/uninstall, custom ZDOTDIR, exact byte preservation without final newline, backups, unsafe symlinks, missing integration repair, and malformed/reversed markers.
+- Installer tests cover repeat install/uninstall, custom ZDOTDIR, exact bytes, backups, unsafe symlinks, missing integration repair, partial/reversed blocks and private app-path metadata.
+- Terminal management fixtures cover Off-independent version/check/update, exact arguments, quoting, unsafe marker/path refusal and existing-command preservation.
+- Native update tests use offline metadata and a real URLSession delegate: versions, repository/tag assets, redirects, sizes, HTTP failures, checksums, private unique files and macOS quarantine.
 - A temporary case-sensitive HFSX image on the runner exercises the case-specific path test; the default runner filesystem test may skip because it is case-insensitive.
 - A universal native app is built and ad-hoc signed/verified. State self-tests check On/Off/re-enable, exact bytes, malformed state, permissions and symlinks.
 - A controller lifecycle test invokes actual toggle and Disable and Quit actions against isolated temporary state. Native Settings assertions check install-first controls and On/Off state.
@@ -59,7 +61,7 @@ Targets: added startup p95 ≤30 ms, first useful suggestion p95 ≤100 ms. Repo
 | Custom ZDOTDIR | Explicit folder selection in Settings, with installer fixture containing spaces. |
 | Custom key macros / unsupported syntax | Safe refusal/fallback; no broad shell parser. |
 | Missing intermediate path ancestors | Correction is final-component only; leaves unsupported paths intact. |
-| Developer ID / notarization | Not configured. Ad-hoc integrity signing does not establish Gatekeeper trust. |
+| Free distribution | Ad-hoc community beta; no Developer ID/notarization. Per-app approval remains a user decision; managed Macs may refuse it. |
 
 ## Reviews and release checks
 

@@ -39,6 +39,14 @@ jobs:
         run: for script in Integration/*.zsh; do /bin/zsh -n "$script"; done
       - name: Installer tests
         run: python3 Tests/Shell/test_install.py 2>&1 | tee results/install-tests.txt
+      - name: Terminal management command tests
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_cli.py 2>&1 | tee results/cli-tests.txt
+      - name: Native update boundary tests
+        if: always() && !cancelled()
+        run: |
+          swiftc App/Updates.swift Tests/Updates/main.swift -o build-update-tests -framework AppKit -framework CoreServices
+          ./build-update-tests | tee results/update-tests.txt
       - name: ZLE tests
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
@@ -64,6 +72,13 @@ jobs:
         id: build
         if: always() && !cancelled()
         run: bash Scripts/build.sh
+      - name: App version command
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: |
+          actual=$("dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --version)
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'dist/Terminal Helper.app/Contents/Info.plist')
+          test "$actual" = "Terminal Helper $version"
+          printf '%s\n' "$actual" | tee results/version-tests.txt
       - name: App state tests
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test | tee results/app-tests.txt'
