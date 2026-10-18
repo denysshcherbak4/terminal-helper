@@ -18,9 +18,9 @@ The MVP workflow runs on GitHub-hosted macOS 15 Apple Silicon and Intel, with co
 
 At [12f8e781](https://github.com/denysshcherbak4/terminal-helper/commit/12f8e78193dcc9a166da32c0c703e36af8f30175), [strict CI](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39042291494) passed 29 PTY cases (one default-filesystem skip), four installer cases, and the dedicated HFSX case on each architecture. Universal compilation, state and actual controller/worker-group lifecycle checks passed. A successful PNG export alone did not prove visual correctness; the exporter now also rejects blank/transparent pixels, and the final PR records the visual inspection of the replacement.
 
-## Upcoming 0.3 verification
+## Published 0.3 verification
 
-Version 0.3 adds explicit in-place installation. The following describes the checks to record, **not a claim that the final 0.3 run or native upgrade has passed**. Use the final exact source commit and complete ARM/Intel jobs before publishing results.
+Published [0.3.0](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.0) adds explicit in-place installation. Exact-source [ARM/Intel CI passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39164011119) at b322ba2f4c462c7e13bf3ca80a342510591f509c, with 72 installer assertions, 74 update assertions, 8 shell-installer and 8 management cases, 32 PTY cases plus a dedicated case-sensitive fixture, actual Launch Services handoff and three lifecycle paths on each architecture. The main merge tree was identical and its CI also passed. This does not establish a consumer Gatekeeper upgrade.
 
 - `Tests/Updates` compiles with `State.swift`, `Updates.swift` and `UpdateInstaller.swift` and retains the release/network/download/checksum/quarantine boundary checks.
 - `Tests/UpdateInstaller` creates signed fixture bundles and a verified fixture DMG. It covers identity/version/signature refusal, supported paths, permissions, owned integration, locks/concurrent edits, atomic bundle exchange, rollback checkpoints, cancellation, quarantine and retained backup. Fixture integration is treated as data, not executed.
@@ -31,13 +31,31 @@ These commands run only on disposable remote macOS runners with empty user Appli
 
 Installed users can explicitly run `terminal-helper version`, `terminal-helper check` and `terminal-helper update` without an account or build tools. Version/check/update do not forward arbitrary arguments, and checks/downloads happen only on request. A 0.2 user still needs one manual Finder upgrade to 0.3 before subsequent in-place updates. Public-download trust, per-app opening approval, restart/re-enable and interrupted-update recovery remain separate manual checks; do not substitute fixture counts or historical timing values for them.
 
+
+
+## Published 0.3 measured snapshot
+
+GitHub macOS 15.7.9 runners: Apple M1 Virtual / Intel i7-8700B 3.20GHz; zsh 5.9, Swift 6.1.2. Completion fixture: 256 entries, 30 repetitions. Startup: 40 paired fresh-shell trials with identical compinit; no forced cache flush. Idle: 2s settling plus six 1s samples. First observations are not guaranteed cold filesystem measurements; VM scheduling is noisy.
+
+| Measurement | ARM | Intel |
+|---|---:|---:|
+| Configured first Tab | 36.06 ms | 25.71 ms |
+| Warm completion p95 | 10.17 ms | 17.43 ms |
+| Unconfigured first-Tab p95 | 332.26 ms | 713.93 ms |
+| Paired added startup p95 | 39.31 ms | 28.44 ms |
+| Off median RSS | 50672 KiB | 24666 KiB |
+| Settled interval CPU | 0.54% | 1.07% |
+| Controller / owned children | 1 / 0 | 1 / 0 |
+
+The 30ms added-startup target was missed on ARM and met on Intel this run. The 100ms target was missed for unconfigured first use on both. Negative paired startup medians do not prove a speedup. App logical size: 1,133,599 bytes. Selected ARM-built universal ZIP: 418,290 bytes; DMG: 721,907 bytes. No claim of zero memory/CPU while Off.
+
 ## Measurement method
 
 Startup: 40 paired fresh `zsh -d -f -i` subprocesses per condition, with identical `compinit -D`; alternating order reduces systematic cache bias. Report baseline/integrated p95 and p95 of paired added time. First observations are recorded separately; no filesystem cache flush is performed. A supplementary in-process EPOCHREALTIME measurement brackets source alone and excludes compinit and scheduling outside that phase; it does not replace the paired startup measurement.
 
 Completion: actual PTY Tab to a visible useful filename, 256 ordinary fixture files plus the private state directory, 30 repetitions. The warm benchmark initializes completion before timing. A separate benchmark uses 30 fresh shells with no `compinit` setup and includes its first-Tab cost. Do not apply warm results to an unconfigured beginner shell.
 
-Recorded snapshot from exact commit 12f8e781, macOS 15.7.9, zsh 5.9, Swift 6.1.2, GitHub-hosted Apple M1 (Virtual) and Intel Core i7-8700B @3.20GHz:
+Historical snapshot from exact commit 12f8e781, macOS 15.7.9, zsh 5.9, Swift 6.1.2, GitHub-hosted Apple M1 (Virtual) and Intel Core i7-8700B @3.20GHz:
 
 | Measurement | Apple M1 VM | Intel VM |
 | --- | ---: | ---: |
@@ -83,3 +101,5 @@ The shell, native app, installer, build/CI, and adjacent callers were read throu
 The formal Codex Security workflow requires a resolved local Git checkout and revision range. That conflicts with the authorized remote-only boundary, so it was not run; independent remote source review is the explicit substitute, not a claimed formal scan.
 
 See [manual verification](MANUAL-VERIFICATION.md) for actual Terminal.app/iTerm2, VoiceOver, appearances, oldest macOS, slow filesystems, install interruption, and release-distribution checks. No public release or personal-Mac installation is implied by a successful CI build.
+
+[Live production CLI installation passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39164938119): current updater source built with fixture version 0.1.0 anonymously installed public 0.2.0, with digest/signature, installed quarantine, backup, Off, exact integration and unchanged shell configuration verified. This was current source with an older fixture version, not a historical client. Consumer opening approval remains manual. The smoke-test macOS portability fix is independently reviewed in PR #5.

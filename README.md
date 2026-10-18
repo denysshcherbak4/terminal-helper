@@ -4,7 +4,7 @@
 
 ## Install on your Mac
 
-[**Download for Mac — v0.2.0 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.2.0/Terminal-Helper-0.2.0-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)
+[**Download for Mac — v0.3.0 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.3.0/Terminal-Helper-0.3.0-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)
 
 **Free community beta · macOS 13+ · Apple Silicon and Intel · no Xcode, Python, Node, or app account**
 
@@ -16,7 +16,7 @@
 
 A free signature does not identify the publisher to Apple or provide malware notarization. Never override a malware/damaged-app warning, globally disable Gatekeeper or remove quarantine. Per-app approval may be needed again after an update and can be unavailable on managed Macs. [Installation help](Docs/INSTALLATION.md)
 
-The public download above is v0.2.0. **Version 0.3.0 with subsequent in-place updates is being prepared on this branch; it is not a published download yet.** [Green CI builds](https://github.com/denysshcherbak4/terminal-helper/actions/workflows/macos.yml?query=branch%3Amain) remain available for technical review and require GitHub sign-in.
+**Version 0.3.0 is published.** The direct download above includes in-place installation for subsequent updates. [Release notes and verification](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.0).
 
 ## Update without building anything
 
@@ -28,7 +28,7 @@ terminal-helper check
 terminal-helper update
 ```
 
-**Already using v0.2? One final manual upgrade is required.** When v0.3 is published, the old update command verifies and opens its DMG. Disable and Quit, replace the app in Finder, reopen, update integration if prompted and restart shells. The installed v0.2 command cannot acquire new behavior merely because this repository changed.
+**Already using v0.2? One final manual upgrade is required.** Run the old update command to verify and open the v0.3 DMG. Disable and Quit, replace the app in Finder, reopen, update integration if prompted and restart shells. The installed v0.2 command cannot acquire new behavior merely because this repository changed.
 
 **In v0.3 and later**, an explicit update action verifies and installs a newer app in place at `~/Applications/Terminal Helper.app` or an eligible user-owned `/Applications/Terminal Helper.app`. It retains an app backup, refreshes exact owned integration data without editing `.zshrc` or settings, and reopens through macOS Launch Services. **Suggestions remain Off: restart shells, then enable them.** Unsupported locations or permissions are refused without elevation. macOS approval may still be required.
 
@@ -37,8 +37,8 @@ There are no timers, startup checks or background downloads. A maintainer must p
 <details>
 <summary>See the native app</summary>
 
-![Terminal Helper 0.2 Settings in light appearance](.github/images/settings-light.png)
-![Terminal Helper 0.2 Settings in dark appearance](.github/images/settings-dark.png)
+![Terminal Helper 0.3 Settings in light appearance](.github/images/settings-light.png)
+![Terminal Helper 0.3 Settings in dark appearance](.github/images/settings-dark.png)
 
 </details>
 

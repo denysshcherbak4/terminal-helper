@@ -4,9 +4,9 @@
 
 Automatic installation starts in **0.3.0**. An already-installed 0.2 executable keeps its old behavior: its update command verifies and opens a DMG for manual replacement. Publishing a release cannot change that installed executable.
 
-When 0.3 is published, download/open its verified DMG, Disable and Quit 0.2, replace the app in Finder, and open 0.3. Update integration if prompted and restart terminal windows. Use `~/Applications/Terminal Helper.app` for installation without administrator rights. After that, 0.3 and later can install subsequent updates in place.
+Download/open the published 0.3 verified DMG, Disable and Quit 0.2, replace the app in Finder, and open 0.3. Update integration if prompted and restart terminal windows. Use `~/Applications/Terminal Helper.app` for installation without administrator rights. After that, 0.3 and later can install subsequent updates in place.
 
-Until 0.3 is published, the README's public download remains 0.2. Branches and CI builds do not update installed users.
+The README links directly to published 0.3. Branches and CI builds do not update installed users.
 
 ## Subsequent updates in 0.3 and later
 

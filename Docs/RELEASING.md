@@ -2,7 +2,7 @@
 
 Repository edits do not update installed users. They explicitly check the latest published, non-prerelease version. Version **0.3.0** adds in-place installation for subsequent updates; a 0.2 client needs one final manual Finder upgrade.
 
-1. Set the default numeric version in Scripts/build.sh to **0.3.0** for this release. Never reuse a published version for different bytes. Keep the public README 0.2 link until the new release asset exists.
+1. Bump the default numeric version in Scripts/build.sh above the current published **0.3.0** for the next release. Never reuse published version assets for different bytes. Keep the current public README download until the new release asset exists.
 2. Review the PR and complete ARM/Intel CI: shell/installer/update tests, staged app identity/version/signature validation, supported-path/permission refusal, bundle/integration swap and handled-error rollback, native checks, renders, package verification and measured target misses. A Terminal.app step can explicitly SKIP.
 3. Select one exact-source CI artifact. Both runner packages are universal; never mix archives/checksums from different runs. Verify SHA256SUMS.txt.
 4. Prepare a draft Release tagged vX.Y.Z at that exact tested commit, titled Terminal Helper X.Y.Z — community beta. Disclose ad-hoc signing, no Developer ID/notarization and manual-validation limits.
