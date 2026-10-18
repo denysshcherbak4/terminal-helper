@@ -83,20 +83,28 @@ ARM/Intel macOS CI covers actual PTY/ZLE interaction, installer recovery, manage
 
 Targets remain added startup p95 ≤30 ms and first useful suggestion p95 ≤100 ms. Historical runs missed startup and unconfigured-first-use targets. Exact-source artifacts include raw logs/measurements; a green build does not establish Apple trust or every native user flow.
 
-Build on a disposable macOS development machine or remote runner:
+Run these commands **only on a disposable remote macOS runner**, with no running Terminal Helper instance, no existing `~/Applications/Terminal Helper.app` and no `~/Library/Application Support/Terminal Helper`. The updater fixtures create and remove data in the runner account's **actual home**, not just a temporary directory. Do not remove a real installation to satisfy their guards, and do not run them on a personal Mac. A GUI session is needed for the controller handoff.
 
 ```sh
 bash Scripts/build.sh
 python3 Tests/Shell/test_pty.py
 python3 Tests/Shell/test_install.py
 python3 Tests/Shell/test_cli.py
-swiftc App/Updates.swift Tests/Updates/main.swift -o build/update-tests -framework AppKit -framework CoreServices
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/Updates/main.swift -o build/update-tests -framework AppKit -framework CoreServices
 build/update-tests
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateInstaller/main.swift -o build/update-installer-tests -framework AppKit -framework CoreServices
+build/update-installer-tests
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateController/main.swift -o build/update-controller-tests -framework AppKit -framework CoreServices
+build/update-controller-tests "$PWD/dist/Terminal Helper.app"
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --settings-self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test
+"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --termination-self-test
+"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --update-cancel-self-test
 python3 Tests/Performance/measure.py
 bash Scripts/package.sh
 ```
+
+The controller fixture runs **after the app build** and opens an unquarantined CI-built copy through Launch Services. This verifies the quit/Off handoff, not a downloaded app's Gatekeeper approval. The standalone update test programs all require the three shared Swift sources shown above. Record results only from the final exact-source complete CI run.
 
 The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in Assets/ and App/Icon.swift. Licensed under [MIT](LICENSE).
