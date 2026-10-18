@@ -44,7 +44,7 @@ hdiutil attach "dist/$name" -readonly -nobrowse -mountpoint "$mount" -quiet
 mounted=1
 [[ -f "$mount/Terminal Helper.app/Contents/MacOS/TerminalHelper" ]] || { echo 'DMG is missing the app.' >&2; exit 1; }
 [[ -L "$mount/Applications" && "$(readlink "$mount/Applications")" == /Applications ]] || { echo 'DMG Applications link is invalid.' >&2; exit 1; }
-xcrun lipo -verify_arch arm64 x86_64 "$mount/Terminal Helper.app/Contents/MacOS/TerminalHelper"
+xcrun lipo "$mount/Terminal Helper.app/Contents/MacOS/TerminalHelper" -verify_arch arm64 x86_64
 codesign --verify --strict "$mount/Terminal Helper.app"
 hdiutil detach "$mount" -quiet
 mounted=0
