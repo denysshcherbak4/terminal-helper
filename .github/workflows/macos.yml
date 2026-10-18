@@ -55,6 +55,8 @@ jobs:
           hdiutil attach -owners on -nobrowse -mountpoint "$case_mount" "$case_root/fixture.dmg" >/dev/null
           mkdir "$case_mount/tmp"
           TMPDIR="$case_mount/tmp" python3 Tests/Shell/test_pty.py CompletionTests.test_case_sensitive_fixture 2>&1 | tee results/case-sensitive-tests.txt
+      - name: Terminal.app interaction smoke
+        run: python3 Tests/Shell/test_terminal.py | tee results/terminal-native.json
       - name: Build universal app
         id: build
         if: always() && !cancelled()

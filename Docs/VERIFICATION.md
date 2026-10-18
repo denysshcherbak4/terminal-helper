@@ -10,14 +10,15 @@ The MVP workflow runs on GitHub-hosted macOS 15 Apple Silicon and Intel, with co
 - Installer tests cover repeat install/uninstall, custom ZDOTDIR, exact byte preservation without final newline, backups, unsafe symlinks, missing integration repair, and malformed/reversed markers.
 - A temporary case-sensitive HFSX image on the runner exercises the case-specific path test; the default runner filesystem test may skip because it is case-insensitive.
 - A universal native app is built and ad-hoc signed/verified. State self-tests check On/Off/re-enable, exact bytes, malformed state, permissions and symlinks.
-- A controller lifecycle test invokes actual toggle and Disable and Quit actions against isolated temporary state.
+- A controller lifecycle test invokes actual toggle and Disable and Quit actions against isolated temporary state. Native Settings assertions check install-first controls and On/Off state.
+- An actual Terminal.app smoke test uses AppleScript to open its own isolated interactive zsh session and queues ZLE keys. It asserts Tab/Enter changes the buffer without changing the working directory. AppleEvents/display unavailability is explicitly recorded as SKIP; a failed assertion fails CI. This does not replace the human terminal/keyboard checklist.
 - The real native Settings content is rendered to PNG for visual review. This is a view render, not a screen recording or proof of every menu/assistive-technology behavior.
 
 At [12f8e781](https://github.com/denysshcherbak4/terminal-helper/commit/12f8e78193dcc9a166da32c0c703e36af8f30175), [strict CI](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39042291494) passed 29 PTY cases (one default-filesystem skip), four installer cases, and the dedicated HFSX case on each architecture. Universal compilation, state and actual controller/worker-group lifecycle checks passed. A successful PNG export alone did not prove visual correctness; the exporter now also rejects blank/transparent pixels, and the final PR records the visual inspection of the replacement.
 
 ## Measurement method
 
-Startup: 40 paired fresh `zsh -d -f -i` subprocesses per condition, with identical `compinit -D`; alternating order reduces systematic cache bias. Report baseline/integrated p95 and p95 of paired added time. First observations are recorded separately; no filesystem cache flush is performed.
+Startup: 40 paired fresh `zsh -d -f -i` subprocesses per condition, with identical `compinit -D`; alternating order reduces systematic cache bias. Report baseline/integrated p95 and p95 of paired added time. First observations are recorded separately; no filesystem cache flush is performed. A supplementary in-process EPOCHREALTIME measurement brackets source alone and excludes compinit and scheduling outside that phase; it does not replace the paired startup measurement.
 
 Completion: actual PTY Tab to a visible useful filename, 256 ordinary fixture files plus the private state directory, 30 repetitions. The warm benchmark initializes completion before timing. A separate benchmark uses 30 fresh shells with no `compinit` setup and includes its first-Tab cost. Do not apply warm results to an unconfigured beginner shell.
 
@@ -51,7 +52,7 @@ Targets: added startup p95 ≤30 ms, first useful suggestion p95 ≤100 ms. Repo
 | --- | --- |
 | macOS 15, Apple Silicon and Intel, zsh 5.9 | Automated PTY, native compilation/state/lifecycle, fixture and measurement jobs; exact results in the selected run. |
 | macOS 13 minimum | Deployment target and selected API availability; oldest-OS runtime validation remains manual. |
-| Terminal.app | Primary intended terminal; generic PTY testing covers real ZLE, but the actual Terminal.app user flow remains a manual release check. |
+| Terminal.app | Primary intended terminal; PTY testing covers real ZLE; the optional native smoke result is recorded in each run. The full human Terminal.app user flow remains a manual release check. |
 | iTerm2 | Not manually validated; no compatibility claim beyond the shared zsh/PTY mechanism. |
 | Case-insensitive filesystem | Default runner fixtures. |
 | Case-sensitive filesystem | Dedicated runner-owned HFSX fixture; case-sensitive APFS still merits manual testing. |
