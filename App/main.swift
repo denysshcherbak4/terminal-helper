@@ -24,6 +24,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var setupMenuItem: NSMenuItem?
     private var helpWindow: NSWindow?
     private var operationStatus = ""
+    private var updateStatus = ""
+    private var updateBusy = false
+    private var updateMenuItem: NSMenuItem?
+    private var updateButton: NSButton?
+    private var settingsUpdateStatus: NSTextField?
+    private var settingsVersion: NSTextField?
     private var worker: IntegrationWorker?
     private var lifecycleChild: pid_t?
     private var configurationDirectory = UserDefaults.standard.string(forKey: "ShellConfigurationDirectory").map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
@@ -46,6 +52,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let heading = NSMenuItem(title: "Terminal Helper", action: nil, keyEquivalent: "")
         heading.isEnabled = false; status.isEnabled = false; integration.isEnabled = false
         menu.addItem(heading)
+        let version = NSMenuItem(title: "Version " + TerminalUpdates.currentVersion, action: nil, keyEquivalent: "")
+        version.isEnabled = false; menu.addItem(version)
         menu.addItem(status)
         toggle.target = self; menu.addItem(toggle)
         menu.addItem(integration)
@@ -54,19 +62,21 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         add("Settings…", action: #selector(showSettings), key: ",")
         add("Help", action: #selector(showHelp))
+        let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updates.target = self; updateMenuItem = updates; menu.addItem(updates)
         menu.addItem(.separator())
         add("Disable and Quit", action: #selector(disableAndQuit), key: "q")
         item.menu = menu
         let mainMenu = NSMenu()
         let appEntry = NSMenuItem(); mainMenu.addItem(appEntry)
         let applicationMenu = NSMenu(title: "Terminal Helper"); appEntry.submenu = applicationMenu
-        for (title, action, key) in [("Settings…", #selector(showSettings), ","), ("Help", #selector(showHelp), ""), ("Disable and Quit", #selector(disableAndQuit), "q")] {
+        for (title, action, key) in [("Settings…", #selector(showSettings), ","), ("Help", #selector(showHelp), ""), ("Check for Updates…", #selector(checkForUpdates), ""), ("Disable and Quit", #selector(disableAndQuit), "q")] {
             let entry = NSMenuItem(title: title, action: action, keyEquivalent: key)
             entry.target = self; applicationMenu.addItem(entry)
         }
         NSApp.mainMenu = mainMenu
         refresh()
-        if !integrationInstalled && CommandLine.arguments.count == 1 { showSettings() }
+        if (!integrationInstalled || integrationNeedsUpdate) && CommandLine.arguments.count == 1 { showSettings() }
         if lifecycleRoot != nil {
             DispatchQueue.main.async {
                 if CommandLine.arguments.contains("--settings-self-test") { self.settingsSelfTest() }
@@ -131,19 +141,33 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         entry.target = self; menu.addItem(entry)
     }
     func menuWillOpen(_ menu: NSMenu) { refresh() }
+    private var integrationURL: URL {
+        lifecycleRoot?.appendingPathComponent("Terminal Helper/integration.zsh") ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Terminal Helper/integration.zsh")
+    }
     private var integrationInstalled: Bool {
-        let path = (lifecycleRoot?.appendingPathComponent("Terminal Helper/integration.zsh") ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Terminal Helper/integration.zsh")).path
         var st = stat()
-        return lstat(path, &st) == 0 && st.st_mode & S_IFMT == S_IFREG && st.st_uid == getuid() && st.st_mode & 0o022 == 0
+        return lstat(integrationURL.path, &st) == 0 && st.st_mode & S_IFMT == S_IFREG && st.st_uid == getuid() && st.st_mode & 0o022 == 0 && st.st_size > 0 && st.st_size <= 262144
+    }
+    private var bundledIntegration: Data? {
+        guard let url = Bundle.main.url(forResource: "terminal-helper", withExtension: "zsh", subdirectory: "Integration") else { return nil }
+        return try? Data(contentsOf: url)
+    }
+    private var integrationNeedsUpdate: Bool {
+        guard integrationInstalled else { return false }
+        guard let expected = bundledIntegration, let installed = try? Data(contentsOf: integrationURL) else { return true }
+        return installed != expected
     }
     private func refresh() {
         let enabled = state.enabled()
+        let installed = integrationInstalled
+        let needsUpdate = integrationNeedsUpdate
+        let setupTitle = !installed ? "Install shell integration…" : (needsUpdate ? "Update shell integration…" : "Repair shell integration…")
         status.title = "Suggestions: \(enabled ? "On" : "Off")"
         toggle.state = enabled ? .on : .off
-        toggle.isEnabled = enabled || (worker == nil && (integrationInstalled || CommandLine.arguments.contains("--lifecycle-test")))
+        toggle.isEnabled = enabled || (worker == nil && ((installed && !needsUpdate) || CommandLine.arguments.contains("--lifecycle-test")))
         setupMenuItem?.isEnabled = worker == nil
-        setupMenuItem?.title = integrationInstalled ? "Repair shell integration…" : "Install shell integration…"
-        integration.title = integrationInstalled ? "Integration file present; restart shells" : "Shell integration: not installed"
+        setupMenuItem?.title = setupTitle
+        integration.title = !installed ? "Shell integration: not installed" : (needsUpdate ? "Shell integration: update required" : "Integration file current; restart shells")
         item.button?.setAccessibilityValue(enabled ? "On" : "Off")
         settingsToggle?.state = toggle.state
         settingsToggle?.isEnabled = toggle.isEnabled
@@ -151,13 +175,17 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsIntegration?.stringValue = integration.title
         settingsOperation?.stringValue = operationStatus
         settingsOperation?.isHidden = operationStatus.isEmpty
-        installButton?.title = integrationInstalled ? "Repair shell integration…" : "Install shell integration…"
+        installButton?.title = setupTitle
         installButton?.isEnabled = worker == nil
-        uninstallButton?.isEnabled = integrationInstalled && worker == nil
+        uninstallButton?.isEnabled = installed && worker == nil
+        updateMenuItem?.isEnabled = !updateBusy
+        updateButton?.isEnabled = !updateBusy
+        settingsUpdateStatus?.stringValue = updateStatus
+        settingsUpdateStatus?.isHidden = updateStatus.isEmpty
     }
     @objc private func changeEnabled() {
-        if !state.enabled(), !CommandLine.arguments.contains("--lifecycle-test"), !integrationInstalled || worker != nil {
-            operationStatus = worker == nil ? "Install shell integration before enabling suggestions." : "Wait for shell integration to finish."
+        if !state.enabled(), !CommandLine.arguments.contains("--lifecycle-test"), !integrationInstalled || integrationNeedsUpdate || worker != nil {
+            operationStatus = worker != nil ? "Wait for shell integration to finish." : (integrationNeedsUpdate ? "Update shell integration before enabling suggestions, then restart open shells." : "Install shell integration before enabling suggestions.")
             showSettings(); return
         }
         do { try state.write(enabled: !state.enabled()); operationStatus = ""; refresh() }
@@ -170,23 +198,33 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         showSettings()
         check(!state.enabled() && !toggle.isEnabled && settingsToggle?.isEnabled == false, "Enable must require integration")
         check(installButton?.isEnabled == true && uninstallButton?.isEnabled == false, "setup actions")
+        check(updateButton?.isEnabled == true && updateMenuItem?.isEnabled == true && settingsVersion?.stringValue == "Version " + TerminalUpdates.currentVersion, "manual update controls and current version")
         changeEnabled()
         check(!state.enabled() && !operationStatus.isEmpty, "missing integration leaves Off and explains setup")
         guard let root = lifecycleRoot else { exit(1) }
         do {
             try state.write(enabled: false)
             let fixture = root.appendingPathComponent("Terminal Helper/integration.zsh")
-            try Data("# test fixture only\n".utf8).write(to: fixture)
+            try Data("# outdated fixture only\n".utf8).write(to: fixture)
             chmod(fixture.path, 0o600)
+            refresh()
+            check(!toggle.isEnabled && installButton?.title == "Update shell integration…", "outdated integration requires update")
+            changeEnabled()
+            check(!state.enabled() && operationStatus.contains("Update shell integration"), "outdated integration cannot enable")
+            guard let expected = bundledIntegration else { check(false, "bundled integration missing"); return }
+            try expected.write(to: fixture)
             refresh()
             check(toggle.isEnabled && settingsToggle?.isEnabled == true && uninstallButton?.isEnabled == true, "installed controls")
             changeEnabled()
             check(state.enabled() && settingsToggle?.state == .on && settingsStatus?.stringValue == "Suggestions: On", "On state and label")
+            try Data("# outdated while On\n".utf8).write(to: fixture)
+            refresh()
+            check(toggle.isEnabled, "Off remains available with outdated integration")
             changeEnabled()
-            check(!state.enabled() && settingsToggle?.state == .off && settingsStatus?.stringValue == "Suggestions: Off", "Off state and label")
+            check(!state.enabled() && settingsToggle?.state == .off && settingsStatus?.stringValue == "Suggestions: Off" && !toggle.isEnabled, "Off state and outdated guard")
             try FileManager.default.removeItem(at: root)
         } catch { fputs("Settings test failed: isolated fixture could not be updated.\n", stderr); exit(1) }
-        print("PASS native Settings: setup required, action availability, On/Off controls and status labels")
+        print("PASS native Settings: setup and upgrade guards, On/Off controls, version and manual update availability (no network)")
         NSApp.terminate(nil)
     }
     private func lifecycleTest() {
@@ -248,15 +286,18 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc private func showSettings() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 470), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 560), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             w.title = "Terminal Helper Settings"; w.isReleasedWhenClosed = false
-            w.contentMinSize = NSSize(width: 460, height: 450)
+            w.contentMinSize = NSSize(width: 460, height: 540)
             let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 14
             stack.translatesAutoresizingMaskIntoConstraints = false
             w.contentView!.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: w.contentView!.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(equalTo: w.contentView!.trailingAnchor, constant: -24), stack.topAnchor.constraint(equalTo: w.contentView!.topAnchor, constant: 24), stack.bottomAnchor.constraint(lessThanOrEqualTo: w.contentView!.bottomAnchor, constant: -24)])
             let title = NSTextField(labelWithString: "Helpful terminal suggestions")
             title.font = .systemFont(ofSize: 17, weight: .semibold); stack.addArrangedSubview(title)
+            let version = NSTextField(labelWithString: "Version " + TerminalUpdates.currentVersion)
+            version.setAccessibilityLabel("Installed version")
+            stack.addArrangedSubview(version); settingsVersion = version
             let statusLabel = NSTextField(labelWithString: "Suggestions: Off")
             stack.addArrangedSubview(statusLabel); settingsStatus = statusLabel
             func paragraph(_ text: String) -> NSTextField {
@@ -272,7 +313,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             stack.addArrangedSubview(install); installButton = install
             let button = NSButton(checkboxWithTitle: "Enable suggestions", target: self, action: #selector(changeEnabled))
             button.setAccessibilityLabel("Enable suggestions")
-            button.setAccessibilityHelp("Install shell integration first. Off is checked at the next completion or acceptance.")
+            button.setAccessibilityHelp("Install or update shell integration first. Off is checked at the next completion or acceptance.")
             stack.addArrangedSubview(button); settingsToggle = button
             _ = paragraph("Off takes effect at the next completion or acceptance. The menu-bar app stays open while suggestions are disabled.")
             settingsOperation = paragraph("")
@@ -282,6 +323,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let uninstall = NSButton(title: "Uninstall shell integration…", target: self, action: #selector(uninstallIntegration))
             actions.addArrangedSubview(uninstall); uninstallButton = uninstall
             stack.addArrangedSubview(actions)
+            let updates = NSButton(title: "Check for Updates…", target: self, action: #selector(checkForUpdates))
+            updates.setAccessibilityHelp("Check GitHub for a published release only when you request it.")
+            stack.addArrangedSubview(updates); updateButton = updates
+            settingsUpdateStatus = paragraph("")
+            settingsUpdateStatus?.setAccessibilityLabel("Update result")
             window = w; w.center()
         }
         refresh(); window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
@@ -312,6 +358,61 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             helpWindow = w; w.center()
         }
         helpWindow?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    @objc private func checkForUpdates() {
+        guard !updateBusy else { return }
+        updateBusy = true; updateStatus = "Checking for a published release…"; refresh()
+        TerminalUpdates.check { result in
+            DispatchQueue.main.async {
+                guard !self.quitting else { return }
+                self.updateBusy = false
+                switch result {
+                case .failure(let error):
+                    self.updateStatus = error.localizedDescription
+                    self.refresh(); self.report("Could not check for updates", detail: self.updateStatus)
+                case .success(.noPublishedRelease):
+                    self.updateStatus = "No published release is available yet."
+                    self.refresh(); self.report("No published release", detail: self.updateStatus)
+                case .success(.upToDate):
+                    self.updateStatus = "Version " + TerminalUpdates.currentVersion + " is up to date."
+                    self.refresh(); self.report("You are up to date", detail: self.updateStatus)
+                case .success(.available(let offer)):
+                    self.updateStatus = "Version " + offer.version + " is available."
+                    self.refresh()
+                    let alert = NSAlert()
+                    alert.messageText = "Terminal Helper " + offer.version + " is available"
+                    alert.informativeText = "This free beta is ad-hoc signed, without Developer ID or Apple notarization. Downloading verifies its published checksum; it does not install or replace the app. See Help for Apple's per-app Open Anyway process if you trust this download."
+                    alert.addButton(withTitle: "Download Update"); alert.addButton(withTitle: "Not Now")
+                    if alert.runModal() == .alertFirstButtonReturn { self.downloadUpdate(offer) }
+                }
+            }
+        }
+    }
+    private func downloadUpdate(_ offer: UpdateOffer) {
+        guard !updateBusy else { return }
+        updateBusy = true; updateStatus = "Downloading and verifying version " + offer.version + "…"; refresh()
+        TerminalUpdates.download(offer) { result in
+            DispatchQueue.main.async {
+                guard !self.quitting else { return }
+                self.updateBusy = false
+                switch result {
+                case .failure(let error):
+                    self.updateStatus = error.localizedDescription
+                    self.refresh(); self.report("Could not download update", detail: self.updateStatus)
+                case .success(let url):
+                    self.updateStatus = "Update downloaded and checksum verified. Quit before replacing the app."
+                    self.refresh()
+                    let alert = NSAlert()
+                    alert.messageText = "Update downloaded and verified"
+                    alert.informativeText = "Open the disk image, choose Disable and Quit in Terminal Helper, then drag the new app to Applications and replace the old copy. Reopen Terminal Helper, choose Update shell integration if prompted, and restart open terminal shells. This app will not replace itself or change macOS security settings."
+                    alert.addButton(withTitle: "Open Disk Image"); alert.addButton(withTitle: "Not Now")
+                    if alert.runModal() == .alertFirstButtonReturn, !NSWorkspace.shared.open(url) {
+                        self.updateStatus = "The verified disk image could not be opened. Try again from its download folder."
+                        self.refresh(); self.report("Could not open disk image", detail: self.updateStatus)
+                    }
+                }
+            }
+        }
     }
     @objc private func installIntegration() { runIntegration("install") }
     @objc private func uninstallIntegration() {
@@ -346,7 +447,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             selectedDirectory = selected
         default: return
         }
-        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": selectedDirectory.path]
+        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": selectedDirectory.path, "TERMINAL_HELPER_APP_PATH": Bundle.main.bundleURL.path]
         do {
             operationStatus = operation == "install" ? "Installing shell integration…" : "Uninstalling shell integration…"
             worker = try IntegrationWorker(arguments: ["-f", script.path], environment: environment) { status in
@@ -373,6 +474,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 }
 
+if let status = updateCommandLine() { exit(status) }
 if CommandLine.arguments.contains("--self-test") {
     do { try stateSelfTest(); exit(0) } catch { fputs("\(error)\n", stderr); exit(1) }
 }
