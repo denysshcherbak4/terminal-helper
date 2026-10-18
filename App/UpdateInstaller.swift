@@ -161,10 +161,10 @@ enum UpdateInstaller {
         }
     }
 
-    static func reopen(_ target: URL) -> Bool {
+    static func reopen(_ target: URL, updated: Bool = false) -> Bool {
         let done = DispatchSemaphore(value: 0)
         var launched = false
-        let configuration = NSWorkspace.OpenConfiguration(); configuration.arguments = ["--updated"]
+        let configuration = NSWorkspace.OpenConfiguration(); configuration.arguments = updated ? ["--updated"] : []
         NSWorkspace.shared.openApplication(at: target, configuration: configuration) { app, error in
             launched = app != nil && error == nil; done.signal()
         }
@@ -301,6 +301,6 @@ enum UpdateInstaller {
             _ = reopen(target)
             throw error
         }
-        return UpdateInstallation(backup: staged, relaunched: reopen(target))
+        return UpdateInstallation(backup: staged, relaunched: reopen(target, updated: true))
     }
 }

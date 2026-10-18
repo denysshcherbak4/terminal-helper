@@ -47,6 +47,11 @@ jobs:
         run: |
           swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/Updates/main.swift -o build-update-tests -framework AppKit -framework CoreServices
           ./build-update-tests | tee results/update-tests.txt
+      - name: App update installation and rollback tests
+        if: always() && !cancelled()
+        run: |
+          swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateInstaller/main.swift -o build-installer-tests -framework AppKit -framework CoreServices
+          ./build-installer-tests | tee results/update-install-tests.txt
       - name: ZLE tests
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
@@ -88,6 +93,9 @@ jobs:
       - name: Controller lifecycle test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test | tee results/lifecycle-tests.txt'
+      - name: External quit lifecycle test
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --termination-self-test | tee results/termination-tests.txt'
       - name: Completion timing
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json
