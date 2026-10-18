@@ -240,6 +240,14 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.terminate(nil)
     }
     private func lifecycleTest() {
+        if CommandLine.arguments.contains("--termination-self-test") {
+            let watchdog = Timer(timeInterval: 15, repeats: false) { _ in
+                fputs("External quit test timed out waiting for deferred termination.\n", stderr)
+                exit(124)
+            }
+            RunLoop.main.add(watchdog, forMode: .default)
+            RunLoop.main.add(watchdog, forMode: .modalPanel)
+        }
         guard !state.enabled() else { exit(1) }
         changeEnabled()
         guard state.enabled(), toggle.state == .on else { exit(1) }
@@ -277,8 +285,14 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let updateChild = readPID("update-child-pid")
         if let child = readPID("child-pid"), !CommandLine.arguments.contains("--update-cancel-self-test") || updateChild != nil {
             lifecycleChild = child; lifecycleUpdateChild = updateChild
-            if CommandLine.arguments.contains("--termination-self-test") { NSApp.terminate(nil) }
-            else { disableAndQuit() }
+            if CommandLine.arguments.contains("--termination-self-test") {
+                // terminateLater enters a modal loop; do not hold a main GCD block open.
+                fputs("External quit test: scheduling an AppKit run-loop request.\n", stderr)
+                RunLoop.main.perform(inModes: [.default, .modalPanel]) {
+                    fputs("External quit test: requesting termination.\n", stderr)
+                    NSApp.terminate(nil)
+                }
+            } else { disableAndQuit() }
         } else if attempts > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.waitForLifecycleChild(attempts: attempts - 1) }
         } else {
@@ -301,6 +315,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if pendingTerminationReply {
             pendingTerminationReply = false
+            if CommandLine.arguments.contains("--termination-self-test") { fputs("External quit test: owned group reaped; replying to deferred termination.\n", stderr) }
             NSApp.reply(toApplicationShouldTerminate: true)
         } else { NSApp.terminate(nil) }
     }
@@ -318,6 +333,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             refresh()
             if let worker = worker, worker.isRunning {
                 pendingTerminationReply = true
+                if CommandLine.arguments.contains("--termination-self-test") { fputs("External quit test: waiting for owned group termination.\n", stderr) }
                 worker.terminate()
                 return .terminateLater
             }
