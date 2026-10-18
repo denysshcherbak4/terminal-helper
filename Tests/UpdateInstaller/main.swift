@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Darwin
 
 let fm = FileManager.default
@@ -140,5 +141,64 @@ do {
     try expect(getxattr(f.stage.appendingPathComponent("Contents/MacOS/TerminalHelper").path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "executable quarantine")
     try f.replace()
     try expect(getxattr(f.target.path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "installed quarantine survives exchange")
+}
+
+// Full image mount/copy/verification path, restricted to a disposable runner's empty user folders.
+do {
+    let home = fm.homeDirectoryForCurrentUser
+    let apps = home.appendingPathComponent("Applications")
+    let target = apps.appendingPathComponent("Terminal Helper.app")
+    let support = home.appendingPathComponent("Library/Application Support/Terminal Helper")
+    guard !fm.fileExists(atPath: target.path), !fm.fileExists(atPath: support.path) else {
+        throw UpdateFailure.invalid("Full installer fixture requires an empty disposable runner; refusing existing installation.")
+    }
+    try fm.createDirectory(at: apps, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    try makeApp(target, version: "0.3.0", integration: "# original\n")
+    defer { try? fm.removeItem(at: target); try? fm.removeItem(at: support) }
+    let imageSource = root.appendingPathComponent("disk-source")
+    try fm.createDirectory(at: imageSource, withIntermediateDirectories: false)
+    try makeApp(imageSource.appendingPathComponent("Terminal Helper.app"), version: "0.4.0", integration: "# updated fixture; data only\n")
+    let image = root.appendingPathComponent("fixture.dmg")
+    try UpdateInstaller.command("/usr/bin/hdiutil", ["create", "-srcfolder", imageSource.path, "-format", "UDZO", image.path, "-quiet"])
+    let diskBytes = try Data(contentsOf: image)
+    let digest = SHA256.hash(data: diskBytes).map { String(format: "%02x", $0) }.joined()
+    let name = "Terminal-Helper-0.4.0-universal.dmg"
+    let sums = Data("\(digest)  ./\(name)\n".utf8)
+    let prefix = "https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.4.0/"
+    let offer = UpdateOffer(version: "0.4.0", fileName: name, assetURL: URL(string: prefix + name)!,
+        checksumURL: URL(string: prefix + "SHA256SUMS.txt")!, assetSize: diskBytes.count, checksumSize: sums.count)
+    let catalog = try JSONSerialization.data(withJSONObject: [
+        "tag_name": "v0.4.0", "draft": false, "prerelease": false,
+        "assets": [
+            ["name": name, "browser_download_url": offer.assetURL.absoluteString, "size": diskBytes.count, "state": "uploaded"],
+            ["name": "SHA256SUMS.txt", "browser_download_url": offer.checksumURL.absoluteString, "size": sums.count, "state": "uploaded"]
+        ]
+    ])
+    let saved = try TerminalUpdates.save(diskBytes, offer: offer, downloads: root)
+    try SuggestionState().write(enabled: true)
+    let integration = support.appendingPathComponent("integration.zsh")
+    try Data("# original\n".utf8).write(to: integration); chmod(integration.path, 0o600)
+    let marker = support.appendingPathComponent("app-path")
+    try Data((target.path + "\n").utf8).write(to: marker); chmod(marker.path, 0o600)
+    var requests: [URL] = []
+    let fetch: TerminalUpdates.Fetch = { url, _, done in
+        requests.append(url)
+        if url == TerminalUpdates.catalogURL { done(.success(catalog)) }
+        else if url == offer.checksumURL { done(.success(sums)) }
+        else { done(.failure(UpdateFailure.invalid("Unexpected fixture network request"))) }
+    }
+    var opened: URL?
+    let installed = try UpdateInstaller.install(disk: saved, version: "0.4.0", target: target,
+        fetch: fetch, launch: { opened = $0; return false })
+    defer { try? fm.removeItem(at: installed.backup.deletingLastPathComponent()) }
+    try expect(requests == [TerminalUpdates.catalogURL, offer.checksumURL], "installer rechecks published metadata and checksum")
+    try expect(UpdateInstaller.bundleVersion(target) == "0.4.0", "actual verified DMG mounted and installed")
+    try expect(UpdateInstaller.bundleVersion(installed.backup) == "0.3.0", "full installer keeps original app")
+    try expect(opened == target && !installed.relaunched, "launch request boundary; blocked launch accurately reported")
+    try expect(Data(contentsOf: integration) == Data("# updated fixture; data only\n".utf8), "full installer upgrades owned integration")
+    try expect(!SuggestionState().enabled(), "full installer leaves suggestions Off")
+    try expect(getxattr(target.path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "full installed bundle quarantined")
+    try expect(getxattr(target.appendingPathComponent("Contents/MacOS/TerminalHelper").path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "full installed executable quarantined")
+    try expect(!fm.fileExists(atPath: installed.backup.deletingLastPathComponent().appendingPathComponent("mount").path), "owned image mount detached and removed")
 }
 print("PASS \(checks) installer assertions: signed bundles, atomic exchange, rollback boundaries, Off, exact integration, locks, concurrent edits, quarantine, no execution, unsafe paths/signatures/versions.")

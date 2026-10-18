@@ -247,18 +247,20 @@ enum UpdateInstaller {
         }
     }
 
-    static func install(disk: URL, version: String, target: URL = Bundle.main.bundleURL) throws -> UpdateInstallation {
+    static func install(disk: URL, version: String, target: URL = Bundle.main.bundleURL,
+                        fetch: @escaping TerminalUpdates.Fetch = BoundedRequest.fetch,
+                        launch: (URL) -> Bool = { reopen($0, updated: true) }) throws -> UpdateInstallation {
         let home = manager.homeDirectoryForCurrentUser
         let applications = [home.appendingPathComponent("Applications"), URL(fileURLWithPath: "/Applications")]
         try targetAllowed(target, applications: applications)
         let installedVersion = try bundleVersion(target)
-        let checked: UpdateCheck = try wait { TerminalUpdates.check(current: installedVersion, completion: $0) }
+        let checked: UpdateCheck = try wait { TerminalUpdates.check(current: installedVersion, fetch: fetch, completion: $0) }
         guard case .available(let offer) = checked, offer.version == version else {
             throw fail("The requested update is no longer the latest published version. Check for updates again.")
         }
         try directory(disk.deletingLastPathComponent(), owned: true, privateOnly: true)
         let bytes = try privateData(disk, limit: TerminalUpdates.maximumDownload)
-        let manifest: Data = try wait { BoundedRequest.fetch(offer.checksumURL, 16 * 1024, $0) }
+        let manifest: Data = try wait { fetch(offer.checksumURL, 16 * 1024, $0) }
         try TerminalUpdates.verify(bytes, manifest: manifest, offer: offer)
         guard getxattr(disk.path, "com.apple.quarantine", nil, 0, 0, 0) > 0 else {
             throw fail("The downloaded disk image is missing macOS security information.")
@@ -301,6 +303,6 @@ enum UpdateInstaller {
             _ = reopen(target)
             throw error
         }
-        return UpdateInstallation(backup: staged, relaunched: reopen(target, updated: true))
+        return UpdateInstallation(backup: staged, relaunched: launch(target))
     }
 }
