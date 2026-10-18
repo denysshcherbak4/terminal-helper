@@ -205,6 +205,9 @@ do {
     try expect(UpdateInstaller.bundleVersion(target) == "0.4.0", "actual verified DMG mounted and installed")
     try expect(UpdateInstaller.bundleVersion(installed.backup) == "0.3.0", "full installer keeps original app")
     try expect(opened == target && !installed.relaunched, "launch request boundary; blocked launch accurately reported")
+    var lateLaunch = false
+    let cancelled = UpdateInstaller.finish(backup: installed.backup, target: target, cancelled: true, launch: { _ in lateLaunch = true; return true })
+    try expect(!cancelled.relaunched && !lateLaunch, "late cancellation retains installed app and backup without relaunch")
     try expect(Data(contentsOf: integration) == Data("# updated fixture; data only\n".utf8), "full installer upgrades owned integration")
     try expect(!SuggestionState().enabled(), "full installer leaves suggestions Off")
     try expect(getxattr(target.path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "full installed bundle quarantined")

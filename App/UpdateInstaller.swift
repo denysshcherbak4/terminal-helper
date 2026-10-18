@@ -197,9 +197,11 @@ enum UpdateInstaller {
     }
 
     static func reopen(_ target: URL, updated: Bool = false) -> Bool {
+        guard cancellation?.cancelled != true else { return false }
         let done = DispatchSemaphore(value: 0)
         var launched = false
         let configuration = NSWorkspace.OpenConfiguration(); configuration.arguments = updated ? ["--updated"] : []
+        guard cancellation?.cancelled != true else { return false }
         NSWorkspace.shared.openApplication(at: target, configuration: configuration) { app, error in
             launched = app != nil && error == nil; done.signal()
         }
@@ -209,6 +211,10 @@ enum UpdateInstaller {
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         }
         return launched
+    }
+
+    static func finish(backup: URL, target: URL, cancelled: Bool, launch: (URL) -> Bool) -> UpdateInstallation {
+        UpdateInstallation(backup: backup, relaunched: !cancelled && launch(target))
     }
 
     // Keep the tested transaction separate from network, mounted-image and GUI boundaries.
@@ -344,6 +350,6 @@ enum UpdateInstaller {
             if !token.cancelled { _ = reopen(target) }
             throw error
         }
-        return UpdateInstallation(backup: staged, relaunched: launch(target))
+        return finish(backup: staged, target: target, cancelled: token.cancelled, launch: launch)
     }
 }

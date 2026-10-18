@@ -77,6 +77,11 @@ jobs:
         id: build
         if: always() && !cancelled()
         run: bash Scripts/build.sh
+      - name: Actual updater controller handoff
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: |
+          swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateController/main.swift -o build-controller-tests -framework AppKit -framework CoreServices
+          ./build-controller-tests "$PWD/dist/Terminal Helper.app" | tee results/update-controller-tests.txt
       - name: App version command
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: |
