@@ -82,7 +82,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         NSApp.mainMenu = mainMenu
         refresh()
-        if (!integrationInstalled || integrationNeedsUpdate) && CommandLine.arguments.count == 1 { showSettings() }
+        if CommandLine.arguments.contains("--updated") {
+            operationStatus = "Update installed. Restart terminal windows, then enable suggestions."
+            showSettings()
+        } else if (!integrationInstalled || integrationNeedsUpdate) && CommandLine.arguments.count == 1 { showSettings() }
         if lifecycleRoot != nil {
             DispatchQueue.main.async {
                 if CommandLine.arguments.contains("--settings-self-test") { self.settingsSelfTest() }
