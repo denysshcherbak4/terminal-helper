@@ -37,6 +37,8 @@ try:
         file.write_bytes(data)
         file.chmod(0o600)
     run = subprocess.run([str(exe), "--update"], capture_output=True, text=True, timeout=360)
+    Path("results").mkdir(exist_ok=True)
+    Path("results/production-cli.txt").write_text(run.stdout + run.stderr)
     print(run.stdout)
     if run.returncode:
         print(run.stderr)
@@ -55,8 +57,8 @@ try:
     with (backup / "Contents/Info.plist").open("rb") as stream:
         assert plistlib.load(stream)["CFBundleShortVersionString"] == "0.1.0"
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(target)], check=True)
-    assert os.getxattr(target, "com.apple.quarantine")
-    assert os.getxattr(exe, "com.apple.quarantine")
+    assert subprocess.check_output(["/usr/bin/xattr", "-p", "com.apple.quarantine", str(target)]).strip()
+    assert subprocess.check_output(["/usr/bin/xattr", "-p", "com.apple.quarantine", str(exe)]).strip()
     assert (support / "state").read_bytes() == b"terminal-helper-v1:off\n"
     assert (support / "integration.zsh").read_bytes() == (target / "Contents/Resources/Integration/terminal-helper.zsh").read_bytes()
     assert (support / "app-path").read_bytes() == (str(target) + "\n").encode()
