@@ -32,6 +32,14 @@ The update command downloads the latest published version, verifies its SHA-256 
 
 It does not silently replace or execute a downloaded app. Repository commits alone do not update anyone: a maintainer must publish a new version. There are no timers, startup checks or automatic downloads. [Update details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
 
+<details>
+<summary>See the native app</summary>
+
+![Terminal Helper 0.2 Settings in light appearance](.github/images/settings-light.png)
+![Terminal Helper 0.2 Settings in dark appearance](.github/images/settings-dark.png)
+
+</details>
+
 ## What it does
 
 Terminal Helper is a native menu-bar app for interactive zsh. Terminal.app is the primary target; full native-terminal/assistive-technology checks remain in the [manual checklist](Docs/MANUAL-VERIFICATION.md).
