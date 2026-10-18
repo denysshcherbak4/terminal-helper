@@ -68,7 +68,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh()
         if !integrationInstalled && CommandLine.arguments.count == 1 { showSettings() }
         if lifecycleRoot != nil {
-            DispatchQueue.main.async { self.lifecycleTest() }
+            DispatchQueue.main.async {
+                if CommandLine.arguments.contains("--settings-self-test") { self.settingsSelfTest() }
+                else { self.lifecycleTest() }
+            }
         }
         if CommandLine.arguments.contains("--smoke-test") { showSettings() }
         if let position = CommandLine.arguments.firstIndex(where: { $0 == "--ui-smoke-test" || $0 == "--render-preview" }), position + 1 < CommandLine.arguments.count {
@@ -129,7 +132,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func menuWillOpen(_ menu: NSMenu) { refresh() }
     private var integrationInstalled: Bool {
-        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Terminal Helper/integration.zsh").path
+        let path = (lifecycleRoot?.appendingPathComponent("Terminal Helper/integration.zsh") ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Terminal Helper/integration.zsh")).path
         var st = stat()
         return lstat(path, &st) == 0 && st.st_mode & S_IFMT == S_IFREG && st.st_uid == getuid() && st.st_mode & 0o022 == 0
     }
@@ -137,7 +140,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let enabled = state.enabled()
         status.title = "Suggestions: \(enabled ? "On" : "Off")"
         toggle.state = enabled ? .on : .off
-        toggle.isEnabled = enabled || (worker == nil && (integrationInstalled || lifecycleRoot != nil))
+        toggle.isEnabled = enabled || (worker == nil && (integrationInstalled || CommandLine.arguments.contains("--lifecycle-test")))
         setupMenuItem?.isEnabled = worker == nil
         setupMenuItem?.title = integrationInstalled ? "Repair shell integration…" : "Install shell integration…"
         integration.title = integrationInstalled ? "Integration file present; restart shells" : "Shell integration: not installed"
@@ -153,12 +156,38 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         uninstallButton?.isEnabled = integrationInstalled && worker == nil
     }
     @objc private func changeEnabled() {
-        if !state.enabled(), lifecycleRoot == nil, !integrationInstalled || worker != nil {
+        if !state.enabled(), !CommandLine.arguments.contains("--lifecycle-test"), !integrationInstalled || worker != nil {
             operationStatus = worker == nil ? "Install shell integration before enabling suggestions." : "Wait for shell integration to finish."
             showSettings(); return
         }
-        do { try state.write(enabled: !state.enabled()); refresh() }
+        do { try state.write(enabled: !state.enabled()); operationStatus = ""; refresh() }
         catch { report("Could not change suggestions", detail: String(describing: error)) }
+    }
+    private func settingsSelfTest() {
+        func check(_ value: Bool, _ message: String) {
+            if !value { fputs("Settings test failed: \(message)\n", stderr); exit(1) }
+        }
+        showSettings()
+        check(!state.enabled() && !toggle.isEnabled && settingsToggle?.isEnabled == false, "Enable must require integration")
+        check(installButton?.isEnabled == true && uninstallButton?.isEnabled == false, "setup actions")
+        changeEnabled()
+        check(!state.enabled() && !operationStatus.isEmpty, "missing integration leaves Off and explains setup")
+        guard let root = lifecycleRoot else { exit(1) }
+        do {
+            try state.write(enabled: false)
+            let fixture = root.appendingPathComponent("Terminal Helper/integration.zsh")
+            try Data("# test fixture only\n".utf8).write(to: fixture)
+            chmod(fixture.path, 0o600)
+            refresh()
+            check(toggle.isEnabled && settingsToggle?.isEnabled == true && uninstallButton?.isEnabled == true, "installed controls")
+            changeEnabled()
+            check(state.enabled() && settingsToggle?.state == .on && settingsStatus?.stringValue == "Suggestions: On", "On state and label")
+            changeEnabled()
+            check(!state.enabled() && settingsToggle?.state == .off && settingsStatus?.stringValue == "Suggestions: Off", "Off state and label")
+            try FileManager.default.removeItem(at: root)
+        } catch { fputs("Settings test failed: isolated fixture could not be updated.\n", stderr); exit(1) }
+        print("PASS native Settings: setup required, action availability, On/Off controls and status labels")
+        NSApp.terminate(nil)
     }
     private func lifecycleTest() {
         guard !state.enabled() else { exit(1) }
@@ -339,7 +368,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try stateSelfTest(); exit(0) } catch { fputs("\(error)\n", stderr); exit(1) }
 }
 let application = NSApplication.shared
-let lifecycleRoot = CommandLine.arguments.contains("--lifecycle-test") ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
+let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
 let controller = Controller(lifecycleRoot: lifecycleRoot)
 application.delegate = controller
 application.run()
