@@ -1,7 +1,7 @@
 # Sourced by the explicitly installed interactive zsh integration.
 [[ -o interactive ]] || return 0
 (( ${+_TH_LOADED} )) && return 0
-typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW=''
+typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW='' _TH_MENU_ACTIVE=0
 
 _th_enabled() {
   zmodload zsh/stat zsh/mapfile || return 1
@@ -85,19 +85,21 @@ _th_tab() {
     _TH_ACTIVE=1
   fi
   _TH_PREVIEW_SET=0
-  # Temporarily use our menu; preserve the user's menu for every other widget.
-  bindkey -N _th_helper_menu menuselect
-  bindkey -A menuselect _th_user_menu
-  bindkey -M _th_helper_menu '^M' _th_menu_accept
-  bindkey -M _th_helper_menu '^J' _th_menu_accept
-  bindkey -M _th_helper_menu '^I' menu-complete
-  bindkey -M _th_helper_menu '^[' _th_cancel
-  bindkey -A _th_helper_menu menuselect
+  # Native selection continues after the completion call; retain this map until it ends.
+  if (( ! _TH_MENU_ACTIVE )); then
+    bindkey -N _th_helper_menu menuselect
+    bindkey -A menuselect _th_user_menu
+    bindkey -M _th_helper_menu '^M' _th_menu_accept
+    bindkey -M _th_helper_menu '^J' _th_menu_accept
+    bindkey -M _th_helper_menu '^I' menu-complete
+    bindkey -M _th_helper_menu '^[' _th_cancel
+    bindkey -A _th_helper_menu menuselect
+    _TH_MENU_ACTIVE=1
+  fi
   {
     zle _th_completion
   } always {
-    bindkey -A _th_user_menu menuselect
-    bindkey -D _th_helper_menu _th_user_menu
+    (( ! TRY_BLOCK_ERROR && _TH_ACTIVE )) || _th_restore_menu
   }
   if (( _TH_ACTIVE )); then
     _TH_PREVIEW=$BUFFER
@@ -115,6 +117,14 @@ _th_completion() {
   fi
 }
 
+_th_restore_menu() {
+  if (( _TH_MENU_ACTIVE )); then
+    bindkey -A _th_user_menu menuselect
+    bindkey -D _th_helper_menu _th_user_menu
+    _TH_MENU_ACTIVE=0
+  fi
+}
+
 _th_accept() {
   if (( _TH_CANCELLED )); then
     _TH_CANCELLED=0
@@ -123,6 +133,7 @@ _th_accept() {
   if (( _TH_ACTIVE )); then
     _th_enabled || { BUFFER=$_TH_ORIGINAL; CURSOR=$_TH_CURSOR; }
     _TH_ACTIVE=0
+    _th_restore_menu
     zle -M ''
     return 0
   fi
@@ -134,6 +145,7 @@ _th_cancel() {
     BUFFER=$_TH_ORIGINAL
     CURSOR=$_TH_CURSOR
     _TH_ACTIVE=0
+    _th_restore_menu
     zle -M ''
   else
     if (( ${+widgets[_th_original_escape]} )); then
@@ -150,11 +162,17 @@ _th_redraw() {
     CURSOR=$_TH_CURSOR
     _TH_ACTIVE=0
     _TH_CANCELLED=1
+    _th_restore_menu
     zle -M 'Terminal Helper: Off; suggestion cancelled'
   elif (( _TH_ACTIVE && _TH_PREVIEW_SET )) && [[ "$BUFFER" != "$_TH_PREVIEW" ]]; then
-    # An edit after completion ends the pending suggestion; Enter is ordinary again.
-    _TH_ACTIVE=0
-    _TH_PREVIEW_SET=0
+    # Arrow selection also edits BUFFER; only actual editing widgets end the pending suggestion.
+    case "$LASTWIDGET" in
+      self-insert|quoted-insert|bracketed-paste|kill-whole-line|kill-buffer|backward-kill-line|backward-delete-char|delete-char|kill-word|backward-kill-word)
+        _TH_ACTIVE=0
+        _TH_PREVIEW_SET=0
+        _th_restore_menu
+        ;;
+    esac
   fi
 }
 
@@ -166,7 +184,7 @@ _th_newline() {
   if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle _th_original_newline; fi
 }
 
-_th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; }
+_th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; _th_restore_menu; }
 
 _th_menu_accept() {
   # A custom menu widget exits selection; never accept/execute the command here.

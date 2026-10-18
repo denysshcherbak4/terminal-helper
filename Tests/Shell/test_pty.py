@@ -320,6 +320,15 @@ class CompletionTests(unittest.TestCase):
         out = self.shell.buffer()
         self.assertIn('DUMP:"cd Cho":6', out)
 
+    def test_disable_during_arrow_menu_restores_original(self):
+        (self.home / 'ChoiceOne').mkdir()
+        (self.home / 'ChoiceTwo').mkdir()
+        self.complete('cd Cho')
+        self.state(False)
+        self.shell.send('\x1b[B\r')
+        self.shell.read()
+        self.assertIn('DUMP:"cd Cho":6', self.shell.buffer())
+
     def test_arrow_navigation_and_enter_only_edits(self):
         (self.home / 'ChoiceOne').mkdir()
         (self.home / 'ChoiceTwo').mkdir()
