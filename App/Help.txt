@@ -1,6 +1,13 @@
 TERMINAL HELPER
 Helpful terminal suggestions, with one switch to turn them off.
 
+INSTALLING THE FREE BETA
+The free beta is ad-hoc signed, without Developer ID or Apple notarization. Download only from the project's published GitHub release and verify its checksum. Open the disk image, drag Terminal Helper to Applications, then open the app from Applications.
+
+If macOS says the developer cannot be verified or Apple cannot check the app, and you are certain that this download is trustworthy and unmodified, follow Apple's per-app process: after trying to open the app, go to System Settings > Privacy & Security > Open Anyway, then confirm Open. This creates an exception for this app; do not disable Gatekeeper globally or remove quarantine. Do not override a warning that the app is damaged or will harm your computer.
+
+Apple's instructions: https://support.apple.com/102445
+
 GET STARTED
 1. In Settings, choose Install shell integration.
 2. Choose Use Home folder for a standard zsh setup. If you configured ZDOTDIR, choose that folder instead. The app remembers the folder after a successful installation for repair and uninstall. A failed operation keeps the previous successful choice. Uninstall clears this preference.
@@ -17,8 +24,15 @@ Turn off Enable suggestions to stop assistance. Open shells check state at their
 
 Disable and Quit writes Off, terminates any app-owned installer workers, and exits. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
 
+UPDATES
+Check for Updates in the menu bar or Settings contacts GitHub only when you request it. The current version is shown in both places. There is no automatic checking or background polling.
+
+When a newer published release exists, Download Update verifies the disk image against its published checksum. Choose Open Disk Image explicitly, then Disable and Quit before dragging the new app to Applications and replacing the previous copy. Reopen it, choose Update shell integration if shown, and restart your terminal shells. The app never replaces itself, removes quarantine, or changes security settings.
+
+You can also use terminal-helper version, terminal-helper check, and terminal-helper update after installing the current shell integration. The update command downloads and verifies; installation remains a deliberate Finder action.
+
 TROUBLESHOOTING
-If Enable suggestions is unavailable, install shell integration first and wait for installation to finish.
+If Enable suggestions is unavailable, install or update shell integration first and wait for it to finish. When an installed script differs from this app's bundled version, Update shell integration is the primary action. Off remains available even when the integration is outdated.
 
 If nothing appears after Tab, open a new terminal window and check that you are running interactive zsh. The menu reports whether the integration file exists; it cannot verify which already-open shells loaded it. Use Repair shell integration when needed.
 
@@ -36,6 +50,6 @@ UNINSTALL
 Choose Uninstall shell integration in Settings and use the same configuration folder. Restart open terminal shells, choose Disable and Quit, then remove Terminal Helper from Applications. Keep any configuration backup you want to retain.
 
 PRIVACY AND COMPATIBILITY
-No command history, command buffers, environment contents, or filenames are logged or uploaded. There is no cloud service, telemetry, global keyboard monitoring, or background indexing. No Accessibility or screen-recording permission is needed.
+No command history, command buffers, environment contents, or filenames are logged or uploaded. Explicit update checks and downloads contact GitHub; no checks run automatically. There is no cloud AI, telemetry, global keyboard monitoring, or background indexing. No Accessibility or screen-recording permission is needed.
 
-The test build targets macOS 13 or later on Apple silicon and Intel. Automated macOS runner tests are documented separately; physical Terminal.app and iTerm2 behavior needs the documented manual verification. Ad-hoc test builds are not Developer ID signed or notarized. Do not disable Gatekeeper to run them.
+The free beta targets macOS 13 or later on Apple silicon and Intel. Automated macOS runner tests are documented separately; physical Terminal.app and iTerm2 behavior needs the documented manual verification. Ad-hoc beta builds are not Developer ID signed or notarized. Use only Apple's per-app process described above when you trust the download; managed Macs may restrict this option.

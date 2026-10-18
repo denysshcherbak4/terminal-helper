@@ -14,9 +14,15 @@
 
 **A menu was open when I switched Off.** The next completion/acceptance interaction cancels it. Instant disappearance of every open menu is not promised.
 
-**macOS does not trust the download.** The current engineering artifact has ad-hoc signing, no Developer ID identity and no notarization. Do not disable Gatekeeper. A signed and notarized build is needed for the intended normal public installation flow.
+**macOS does not trust the download.** The free beta is ad-hoc signed, without Developer ID/notarization. After attempting to open it, users trusting this exact download may follow [Apple’s per-app process](https://support.apple.com/102445): System Settings → Privacy & Security → Open Anyway. Managed Macs may refuse it. Never override malware/damaged-app warnings, globally disable Gatekeeper or remove quarantine.
 
 **I want to uninstall.** Choose Uninstall shell integration in Settings and the original configuration folder, restart open shells, then delete the app. Missing state keeps any retained widgets disabled. Remove remaining owned support files only after those shells close; keep your backups if you may need them.
 
 
 **The installer says another operation is in progress.** Install and uninstall serialize edits with a private `.integration-lock` directory. Wait for the operation to finish. A forced kill can leave a stale lock; do not automatically delete it or run two installers. Close Terminal Helper and confirm no installer is running before using `rmdir "$HOME/Library/Application Support/Terminal Helper/.integration-lock"`. This removes only an empty owned lock. If it is nonempty or not yours, stop and inspect it; do not recursively delete the support folder. Then retry installation/repair.
+
+**terminal-helper is not found or the app moved.** Open the current app, install/update/repair integration, then open a new terminal. Existing aliases/functions/commands with this name are deliberately preserved; use the menu instead. Repair after moving the app to refresh its private path.
+
+**Updates say no release is published.** A commit or draft is not a public release. A maintainer must publish a numeric version before it is offered.
+
+**A download fails or its checksum differs.** Retry later and check GitHub connectivity/rate limits. Mismatched or oversized responses are not opened; the previous app remains untouched. Never bypass the check or run a remote installer script.

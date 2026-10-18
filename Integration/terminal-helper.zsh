@@ -3,6 +3,46 @@
 (( ${+_TH_LOADED} )) && return 0
 typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW='' _TH_MENU_ACTIVE=0
 
+# Explicit management commands work independently of the suggestions switch.
+if ! whence -w terminal-helper >/dev/null 2>&1; then
+  function terminal-helper {
+    local flag base="$HOME/Library/Application Support/Terminal Helper" record app executable
+    local -A info
+    (( $# == 1 )) || { print -u2 'Usage: terminal-helper version|check|update'; return 2; }
+    case "$1" in
+      version) flag=--version ;;
+      check) flag=--check-for-updates ;;
+      update) flag=--update ;;
+      *) print -u2 'Usage: terminal-helper version|check|update'; return 2 ;;
+    esac
+    zmodload zsh/stat zsh/mapfile || return 1
+    if [[ ! -d "$base" || -L "$base" || ! -O "$base" ]] ||
+       ! zstat -H info -- "$base" 2>/dev/null ||
+       (( (info[mode] & 8#7777) != 8#700 )); then
+      print -u2 'Open Terminal Helper and reinstall shell integration.'
+      return 1
+    fi
+    if [[ ! -f "$base/app-path" || -L "$base/app-path" || ! -O "$base/app-path" ]] ||
+       ! zstat -H info -- "$base/app-path" 2>/dev/null ||
+       (( (info[mode] & 8#7777) != 8#600 || info[size] < 2 || info[size] > 4097 )); then
+      print -u2 'Open Terminal Helper and reinstall shell integration.'
+      return 1
+    fi
+    record=$mapfile[$base/app-path]
+    app=$record[1,-2]
+    if [[ "$record" != "$app"$'\n' || "$app" != /*.app || "$app" == *[[:cntrl:]]* ]]; then
+      print -u2 'Open Terminal Helper and reinstall shell integration.'
+      return 1
+    fi
+    executable="$app/Contents/MacOS/TerminalHelper"
+    if [[ ! -d "$app" || -L "$app" || ! -f "$executable" || -L "$executable" || ! -x "$executable" ]]; then
+      print -u2 'Recorded app is unavailable. Open Terminal Helper and reinstall shell integration.'
+      return 1
+    fi
+    "$executable" "$flag"
+  }
+fi
+
 _th_enabled() {
   zmodload zsh/stat zsh/mapfile || return 1
   local base="$HOME/Library/Application Support/Terminal Helper" value

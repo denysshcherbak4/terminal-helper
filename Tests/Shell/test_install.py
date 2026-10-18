@@ -113,5 +113,62 @@ class InstallationTests(unittest.TestCase):
             self.assertEqual(config.stat().st_mode & 0o777, 0o640)
             self.assertFalse((base / '.integration-lock').exists())
 
+    def test_app_path_record_install_repair_and_uninstall(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config = home / '.zshrc'
+            config.write_bytes(b'KEEP=1')
+            apps = []
+            for name in ('Terminal Helper Дані.app', 'Updated Helper Дані.app'):
+                app = home / name
+                binary = app / 'Contents/MacOS/TerminalHelper'
+                binary.parent.mkdir(parents=True)
+                binary.write_text('#!/bin/zsh -f\nexit 0\n')
+                binary.chmod(0o700)
+                apps.append(app)
+            env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
+                   'TERMINAL_HELPER_APP_PATH': str(apps[0])}
+            install = ['/bin/zsh', str(ROOT / 'Integration/install.zsh')]
+            result = subprocess.run(install, env=env, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            marker = home / 'Library/Application Support/Terminal Helper/app-path'
+            self.assertEqual(marker.read_text(), str(apps[0]) + '\n')
+            self.assertEqual(marker.stat().st_mode & 0o7777, 0o600)
+            configured = config.read_bytes()
+            marker.write_text('broken')
+            marker.chmod(0o644)
+            env['TERMINAL_HELPER_APP_PATH'] = str(apps[1])
+            result = subprocess.run(install, env=env, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            self.assertEqual(marker.read_text(), str(apps[1]) + '\n')
+            self.assertEqual(marker.stat().st_mode & 0o7777, 0o600)
+            self.assertEqual(config.read_bytes(), configured)
+            result = subprocess.run(['/bin/zsh', str(ROOT / 'Integration/uninstall.zsh')], env=env, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            self.assertFalse(marker.exists())
+            self.assertEqual(config.read_bytes(), b'KEEP=1')
+            self.assertTrue((apps[0] / 'Contents/MacOS/TerminalHelper').exists())
+
+    def test_invalid_app_metadata_is_rejected_before_config_edit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config = home / '.zshrc'
+            config.write_bytes(b'KEEP=1')
+            env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home)}
+            install = ['/bin/zsh', str(ROOT / 'Integration/install.zsh')]
+            for value in ('', 'relative.app', '/tmp/not-a-bundle', '/tmp/bad\n.app', '/tmp/bad\x1b.app'):
+                result = subprocess.run(install, env={**env, 'TERMINAL_HELPER_APP_PATH': value}, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(config.read_bytes(), b'KEEP=1')
+            base = home / 'Library/Application Support/Terminal Helper'
+            target = home / 'untouched-marker'
+            target.write_text('KEEP')
+            (base / 'app-path').symlink_to(target)
+            for name in ('install.zsh', 'uninstall.zsh'):
+                result = subprocess.run(['/bin/zsh', str(ROOT / 'Integration' / name)], env=env, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(config.read_bytes(), b'KEEP=1')
+                self.assertEqual(target.read_text(), 'KEEP')
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

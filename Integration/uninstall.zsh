@@ -26,7 +26,7 @@ cleanup() {
 trap cleanup EXIT ZERR
 trap 'exit 1' HUP INT TERM
 [[ ! -L "$config" && ( ! -e "$config" || ( -f "$config" && -O "$config" ) ) ]] || exit 1
-for owned in "$base/integration.zsh" "$base/state"; do
+for owned in "$base/integration.zsh" "$base/state" "$base/app-path"; do
   [[ ! -L "$owned" && ( ! -e "$owned" || ( -f "$owned" && -O "$owned" ) ) ]] || exit 1
 done
 config_existed=0
@@ -64,7 +64,7 @@ fi
 if [[ "$content" == *"$block"* ]]; then
   replace_config "${content//"$block"/}"
 fi
-/bin/rm -f -- "$base/integration.zsh" "$base/state"
+/bin/rm -f -- "$base/integration.zsh" "$base/state" "$base/app-path"
 # Missing state disables widgets retained in already-open shells.
 remove_empty_base=1
 print 'Integration removed. Restart open shells to restore their original keybindings.'

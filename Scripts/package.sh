@@ -24,20 +24,30 @@ trap cleanup EXIT
 ditto "$app" "$stage/Terminal Helper.app"
 ln -s /Applications "$stage/Applications"
 cat > "$stage/README.txt" <<'HELP'
-Terminal Helper — unsigned preview distribution limitation
+Terminal Helper — free beta for macOS 13+ (Apple silicon and Intel)
 
-This engineering test artifact is ad-hoc signed, without Developer ID or notarization.
-Gatekeeper may refuse to open it. Do not disable Gatekeeper or remove quarantine
-as a workaround. A normally trusted download requires a signed, notarized build.
+This beta is ad-hoc signed. It has no Developer ID signature or Apple
+notarization. Download only from the project's published GitHub release and
+verify its checksum before trusting it.
 
-On an approved, normally trusted distribution: drag Terminal Helper.app to
-Applications, open it from Applications, and use the terminal-shaped menu-bar
-icon. In Settings, install shell integration, open a new terminal, then enable
-suggestions. Choose Home folder unless you use a custom ZDOTDIR.
+1. Drag Terminal Helper.app to Applications, then open it from Applications.
+2. If you trust this unmodified download and macOS reports an unidentified
+   developer or that Apple cannot check the app, after trying to open it use
+   System Settings > Privacy & Security > Open Anyway, then confirm Open.
+   This is Apple's per-app exception; do not disable Gatekeeper globally or
+   remove quarantine. Do not override a damaged-app or malware warning.
+   Apple's instructions: https://support.apple.com/102445
+3. Use the terminal-shaped menu-bar icon. In Settings, install shell integration,
+   open a new terminal window, and enable suggestions. Choose Home folder unless
+   you configured a custom ZDOTDIR.
 
-No app installation or execution is performed by this disk image.
+Updating an existing installation: choose Disable and Quit, replace the app in
+Applications, reopen it, choose Update shell integration if prompted, and restart
+open terminal shells. Update checks are manual; no background polling occurs.
+
+This disk image does not install or execute anything automatically.
 HELP
-name="Terminal-Helper-${version}-${source_sha:0:12}-universal-test.dmg"
+name="Terminal-Helper-${version}-universal.dmg"
 hdiutil create -volname 'Terminal Helper' -srcfolder "$stage" -format UDZO -ov "dist/$name"
 hdiutil verify "dist/$name"
 hdiutil attach "dist/$name" -readonly -nobrowse -mountpoint "$mount" -quiet
@@ -57,4 +67,4 @@ mounted=0
     done > SHA256SUMS.txt
 )
 rm -f dist/SHA256SUMS
-printf 'Packaged dist/%s (engineering test build; not notarized)\n' "$name"
+printf 'Packaged dist/%s (free ad-hoc beta; not notarized)\n' "$name"
