@@ -5,9 +5,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let lifecycleRoot: URL?
     private var quitting = false
     private var pendingTerminationReply = false
-    private var updateInstaller: Process?
+    private var updateInstaller: IntegrationWorker?
+    private var cancelUpdateOnQuit = false
     private var lifecycleTestMode: Bool {
-        CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--termination-self-test")
+        CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--termination-self-test") || CommandLine.arguments.contains("--update-cancel-self-test")
     }
     init(lifecycleRoot: URL? = nil) {
         self.lifecycleRoot = lifecycleRoot
@@ -37,6 +38,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsVersion: NSTextField?
     private var worker: IntegrationWorker?
     private var lifecycleChild: pid_t?
+    private var lifecycleUpdateChild: pid_t?
     private var configurationDirectory = UserDefaults.standard.string(forKey: "ShellConfigurationDirectory").map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -255,27 +257,40 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard self.quitting else { fputs("Lifecycle failed: worker exited before Quit.\n", stderr); exit(1) }
                 self.finishQuit()
             }
+            if CommandLine.arguments.contains("--update-cancel-self-test") {
+                updateInstaller = try IntegrationWorker(arguments: ["-f", "-c", program, "update-cancel-test", root.appendingPathComponent("update-child-pid").path], environment: ["PATH": "/usr/bin:/bin"]) { _ in
+                    self.updateInstaller = nil
+                    guard self.quitting else { fputs("Lifecycle failed: update test worker exited before Quit.\n", stderr); exit(1) }
+                    self.finishQuit()
+                }
+            }
             waitForLifecycleChild(attempts: 100)
         } catch { fputs("Lifecycle failed: cannot start owned test worker.\n", stderr); exit(1) }
     }
     private func waitForLifecycleChild(attempts: Int) {
-        if let root = lifecycleRoot,
-           let text = try? String(contentsOf: root.appendingPathComponent("child-pid"), encoding: .utf8),
-           let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 {
-            lifecycleChild = pid
+        func readPID(_ name: String) -> pid_t? {
+            guard let root = lifecycleRoot,
+                  let text = try? String(contentsOf: root.appendingPathComponent(name), encoding: .utf8),
+                  let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 else { return nil }
+            return pid
+        }
+        let updateChild = readPID("update-child-pid")
+        if let child = readPID("child-pid"), !CommandLine.arguments.contains("--update-cancel-self-test") || updateChild != nil {
+            lifecycleChild = child; lifecycleUpdateChild = updateChild
             if CommandLine.arguments.contains("--termination-self-test") { NSApp.terminate(nil) }
             else { disableAndQuit() }
         } else if attempts > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.waitForLifecycleChild(attempts: attempts - 1) }
         } else {
-            worker?.terminate()
+            worker?.terminate(); updateInstaller?.terminate()
             fputs("Lifecycle failed: owned test child did not start.\n", stderr); exit(1)
         }
     }
     private func finishQuit() {
+        guard worker == nil, !cancelUpdateOnQuit || updateInstaller == nil else { return }
         if let root = lifecycleRoot {
             guard !state.enabled() else { fputs("Lifecycle failed: Quit left state On.\n", stderr); exit(1) }
-            if let child = lifecycleChild {
+            for child in [lifecycleChild, lifecycleUpdateChild].compactMap({ $0 }) {
                 guard kill(child, 0) == -1, errno == ESRCH else {
                     fputs("Lifecycle failed: owned child survived Quit.\n", stderr); exit(1)
                 }
@@ -291,7 +306,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if quitting {
-            if worker?.isRunning == true {
+            if worker != nil || (cancelUpdateOnQuit && updateInstaller != nil) {
                 pendingTerminationReply = true
                 return .terminateLater
             }
@@ -300,6 +315,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {
             try state.write(enabled: false)
             quitting = true
+            refresh()
             if let worker = worker, worker.isRunning {
                 pendingTerminationReply = true
                 worker.terminate()
@@ -312,12 +328,15 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
     @objc private func disableAndQuit() {
-        guard !quitting else { return }
+        guard !quitting || !cancelUpdateOnQuit else { return }
         do {
             try state.write(enabled: false)
-            quitting = true
-            if let worker = worker, worker.isRunning { worker.terminate() }
-            else { finishQuit() }
+            quitting = true; cancelUpdateOnQuit = true
+            if updateInstaller != nil { updateStatus = "Cancelling the update before quitting…" }
+            refresh()
+            worker?.terminate()
+            updateInstaller?.terminate(gracePeriod: 15)
+            finishQuit()
         } catch { report("Could not disable safely", detail: "Terminal Helper will stay open. " + String(describing: error)) }
     }
     @objc private func showSettings() {
@@ -455,33 +474,31 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let executable = Bundle.main.executableURL else {
             report("Could not start update", detail: "The current app executable is unavailable. Reinstall a complete app build."); return
         }
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = ["--apply-update", disk.path, version]
-        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-        process.environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
-        // This explicit, short-lived update process must outlive the controller it replaces.
-        process.terminationHandler = { [weak self] completed in
-            DispatchQueue.main.async {
-                guard let self, !self.quitting else { return }
-                self.updateInstaller = nil; self.updateBusy = false
-                self.updateStatus = completed.terminationStatus == 0 ? "Update installed. Restart terminal shells and enable suggestions after reopening." : "The update could not complete. See Help for recovery."
+        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+        do {
+            updateBusy = true
+            updateStatus = "Preparing installation. Terminal Helper will close after validation."
+            // External updater-requested quit preserves this explicit replacement process;
+            // the user's Disable and Quit action cancels and reaps its whole owned group.
+            updateInstaller = try IntegrationWorker(executable: executable.path, arguments: ["--apply-update", disk.path, version], environment: environment) { status in
+                self.updateInstaller = nil
+                if self.quitting {
+                    if self.cancelUpdateOnQuit { self.finishQuit() }
+                    return
+                }
+                self.updateBusy = false
+                self.updateStatus = status == 0 ? "Update installed. Restart terminal shells and enable suggestions after reopening." : "The update could not complete. See Help for recovery."
                 self.refresh()
                 // The internal updater presents its own safe failure alert, including after GUI exit.
             }
-        }
-        do {
-            updateInstaller = process; updateBusy = true
-            updateStatus = "Preparing installation. Terminal Helper will close after validation."
-            refresh(); try process.run()
+            refresh()
         } catch {
             updateInstaller = nil; updateBusy = false
             updateStatus = "The update process could not start. The current app remains open."
             refresh(); report("Could not start update", detail: updateStatus)
         }
     }
+
     @objc private func installIntegration() { runIntegration("install") }
     @objc private func uninstallIntegration() {
         guard worker == nil, updateInstaller == nil else { return }
@@ -548,7 +565,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try stateSelfTest(); exit(0) } catch { fputs("\(error)\n", stderr); exit(1) }
 }
 let application = NSApplication.shared
-let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test") || CommandLine.arguments.contains("--termination-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
+let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test") || CommandLine.arguments.contains("--termination-self-test") || CommandLine.arguments.contains("--update-cancel-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
 let controller = Controller(lifecycleRoot: lifecycleRoot)
 application.delegate = controller
 application.run()

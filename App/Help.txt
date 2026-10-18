@@ -22,7 +22,7 @@ Files, directories, executable names, and your existing command completions are 
 OFF AND QUIT
 Turn off Enable suggestions to stop assistance. Open shells check state at their next completion or acceptance. An existing completion menu may remain visible until that interaction. The idle menu-bar app stays resident while Off.
 
-Disable and Quit writes Off, terminates any shell integration installer workers, and exits. External app-quit requests use the same safe Off and worker-shutdown behavior. An explicitly started update process continues long enough to replace and reopen the app. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
+Disable and Quit writes Off, cancels any explicitly started update, terminates owned integration and update worker groups, waits for them to exit, and then closes the controller. Update cancellation allows time to detach the disk image and clean up validation work. The updater's own external quit request also writes Off and stops integration workers, while allowing that explicitly approved update process to finish replacing and reopening the app. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
 
 UPDATES
 Check for Updates in the menu bar or Settings contacts GitHub only when you request it. The current version is shown in both places. There is no automatic checking or background polling.

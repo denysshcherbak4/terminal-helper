@@ -1,13 +1,13 @@
 import Foundation
 import Darwin
 
-// Only bundled installer code runs in this group; no persistent helper is installed.
+// Only bundled integration or update entry points run in this owned process group.
 final class IntegrationWorker {
     private let pid: pid_t
     private var source: DispatchSourceProcess?
     private(set) var isRunning = true
 
-    init(arguments: [String], environment: [String: String], completion: @escaping (Int32) -> Void) throws {
+    init(executable: String = "/bin/zsh", arguments: [String], environment: [String: String], completion: @escaping (Int32) -> Void) throws {
         var actions: posix_spawn_file_actions_t?
         var attributes: posix_spawnattr_t?
         var result = posix_spawn_file_actions_init(&actions)
@@ -25,13 +25,13 @@ final class IntegrationWorker {
             posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0)
         ]
         guard let failure = setup.first(where: { $0 != 0 }) else {
-            var argv = (["/bin/zsh"] + arguments).map { strdup($0) } + [nil]
+            var argv = ([executable] + arguments).map { strdup($0) } + [nil]
             var env = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
             defer { argv.forEach { free($0) }; env.forEach { free($0) } }
             var child: pid_t = 0
             result = argv.withUnsafeMutableBufferPointer { args in
                 env.withUnsafeMutableBufferPointer { vars in
-                    posix_spawn(&child, "/bin/zsh", &actions, &attributes, args.baseAddress!, vars.baseAddress!)
+                    posix_spawn(&child, executable, &actions, &attributes, args.baseAddress!, vars.baseAddress!)
                 }
             }
             guard result == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(result)) }
@@ -55,11 +55,11 @@ final class IntegrationWorker {
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(failure))
     }
 
-    func terminate() {
+    func terminate(gracePeriod: TimeInterval = 2) {
         guard isRunning else { return }
         kill(-pid, SIGTERM)
         // Only explicit Quit schedules a deadline; idle Off has no timers or polling.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + gracePeriod) { [weak self] in
             if let self, self.isRunning { kill(-self.pid, SIGKILL) }
         }
     }
