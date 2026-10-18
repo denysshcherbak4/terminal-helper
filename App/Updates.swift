@@ -167,6 +167,7 @@ enum TerminalUpdates {
         guard version > installed else { return .upToDate }
         let prefix = "Terminal-Helper-\(version.text)-"
         let disks = release.assets.filter { asset in
+            if asset.name == "Terminal-Helper-\(version.text)-universal.dmg" { return true }
             guard asset.name.hasPrefix(prefix) else { return false }
             let suffix = String(asset.name.dropFirst(prefix.count))
             let ending = suffix.hasSuffix("-universal.dmg") ? "-universal.dmg" : "-universal-test.dmg"

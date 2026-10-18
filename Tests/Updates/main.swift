@@ -10,7 +10,7 @@ func expect(_ value: @autoclosure () -> Bool, _ message: String) {
 func rejects(_ message: String, _ body: () throws -> Void) {
     do { try body(); expect(false, message) } catch { checks += 1 }
 }
-let name = "Terminal-Helper-0.3.0-012345abcdef-universal.dmg"
+let name = "Terminal-Helper-0.3.0-universal.dmg"
 let bytes = Data("verified fixture disk image".utf8)
 let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
 let manifest = Data("\(hash)  ./\(name)\n".utf8)
@@ -41,6 +41,8 @@ for version in ["", "v0.2.0", "1.2", "01.2.3", "1.2.3.4", "1.2.3-beta", "1.2.-3"
 }
 let available = try offer()
 expect(available.version == "0.3.0" && available.fileName == name, "valid release selected")
+_ = try offer(catalog(name: "Terminal-Helper-0.3.0-012345abcdef-universal.dmg"))
+checks += 1
 if case .upToDate = try TerminalUpdates.parse(catalog(), current: "0.3.0") { checks += 1 } else { expect(false, "same version") }
 if case .upToDate = try TerminalUpdates.parse(catalog(), current: "0.4.0") { checks += 1 } else { expect(false, "no downgrade") }
 for data in [Data("not json".utf8), Data(repeating: 32, count: 512 * 1024 + 1), catalog(tag: "v0.3.0-beta"), catalog(draft: true), catalog(preview: true), catalog(size: 0), catalog(size: TerminalUpdates.maximumDownload + 1), catalog(name: "Terminal-Helper-0.3.0-012345abcdef-arm64.dmg"), catalog(name: "../update.dmg")] {
