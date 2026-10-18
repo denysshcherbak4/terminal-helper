@@ -16,12 +16,16 @@ There is no startup request, periodic checker, telemetry beacon or automatic dow
 
 The installed version is compared locally and is not included in the request. Only published release metadata and requested archives/checksums are fetched. Suggestions Off prevents automatic assistance work; it does not block an update action you explicitly request.
 
-Verified DMGs are saved in a new private folder under Downloads, retaining macOS quarantine. Delete them after installing if desired. No downloaded application is launched or replaced automatically.
+Verified DMGs are saved in a new private `Downloads/Terminal Helper <version> <UUID>` folder, retaining macOS quarantine. Delete them after installing if desired.
+
+From 0.3, an explicit installation request can validate and install the app at a supported writable Applications location, refresh exact owned integration data and reopen through macOS Launch Services. This is not a background installation and does not rewrite `.zshrc` or change settings. The controller saves Off before quitting; restart shells and enable suggestions deliberately afterward.
+
+A private `.Terminal-Helper-update-<UUID>` folder beside the app retains the previous app and `RECOVERY.txt`. It contains local app/recovery data, not terminal history. Delete it only after confirming the new version works. App and integration are not a guaranteed combined transaction across a crash or power loss. A 0.2 client still needs manual Finder replacement for its final upgrade to 0.3.
 
 ## Permissions and removal
 
 No global keyboard-monitoring, Accessibility, Screen Recording or password-interception permission is requested. A folder picker and Apple's per-app opening approval are explicit user actions.
 
-Uninstall removes the owned block, integration, state and app-path marker, preserving unrelated configuration and backups. Restart shells before deleting the app or remaining owned support files. Delete saved update folders separately. There is no Terminal Helper cloud account or server data to erase.
+Uninstall removes the owned block, integration, state and app-path marker, preserving unrelated configuration and backups. Restart shells before deleting the app or remaining owned support files. Delete saved download folders and retained app-backup folders separately. There is no Terminal Helper cloud account or server data to erase.
 
 GitHub hosting/downloads, Apple operating-system security checks and optional reports are separate services. Send only synthetic, redacted reproductions in reports.

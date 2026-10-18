@@ -1,6 +1,16 @@
 # Updates
 
-Choose Check for Updates… in the menu-bar app/Settings, or run:
+## One final manual upgrade from 0.2
+
+Automatic installation starts in **0.3.0**. An already-installed 0.2 executable keeps its old behavior: its update command verifies and opens a DMG for manual replacement. Publishing a release cannot change that installed executable.
+
+When 0.3 is published, download/open its verified DMG, Disable and Quit 0.2, replace the app in Finder, and open 0.3. Update integration if prompted and restart terminal windows. Use `~/Applications/Terminal Helper.app` for installation without administrator rights. After that, 0.3 and later can install subsequent updates in place.
+
+Until 0.3 is published, the README's public download remains 0.2. Branches and CI builds do not update installed users.
+
+## Subsequent updates in 0.3 and later
+
+Choose **Check for Updates…** in the menu-bar app/Settings, then choose the offered installation action. Alternatively, after installing integration and opening a new zsh:
 
 ```sh
 terminal-helper version
@@ -8,19 +18,33 @@ terminal-helper check
 terminal-helper update
 ```
 
-Install/update integration and open a new zsh first. An existing command, alias or function named terminal-helper is preserved; use the app menu in that case. If the app moved, open it and repair integration.
+`check` only checks. In 0.3+, `update` explicitly requests download and installation of a newer published release. Nothing downloads or installs on startup or on a timer. Explicit commands remain available while suggestions are Off.
 
-Checks compare the local numeric app version with the latest **published, non-prerelease** vX.Y.Z release. Drafts, prereleases, branches and commits are not offered. No published release is explained explicitly; offline/rate-limit failures are not reported as “up to date.”
+The updater verifies the DMG, expected app identity, release version and signature integrity before replacing the installed app. It requests the controller to save Off and quit, swaps the app, refreshes exact owned integration data, and reopens through macOS Launch Services. **Suggestions stay Off. Restart terminal windows, then enable them deliberately.**
 
-Downloading fetches the checksum and matching universal DMG, verifies bytes, saves privately under Downloads, retains quarantine, and opens the disk image. Then:
+It does not edit `.zshrc`, add a new integration block or change settings. Existing integration must match the known installed version; edited or unsafe integration is refused rather than silently overwritten. Existing aliases/functions/commands named `terminal-helper` are preserved; use the app menu in that case. If the app moved, open it and repair integration.
 
-1. Disable and Quit the old app.
-2. Replace it in the same Applications folder using Finder.
-3. Open it. Users trusting the exact source may need Apple's per-app Privacy & Security → Open Anyway approval again. Never override malware/damaged-app warnings or managed restrictions.
-4. Choose Update shell integration if prompted.
-5. Restart terminal windows and enable suggestions.
+## Supported locations
 
-The updater never executes a downloaded app/script, self-replaces an app or asks for elevation.
+In-place installation supports exactly `~/Applications/Terminal Helper.app`, or `/Applications/Terminal Helper.app` when your account owns and can write the app and the parent passes safety checks. The home Applications folder is recommended.
+
+There is no `sudo`, administrator prompt or privileged helper. Globally writable parents and other locations are refused. If running from Downloads, a mounted DMG or another folder, quit, move the app in Finder to a supported location, reopen and repair integration before retrying.
+
+## Failure and recovery
+
+Download, checksum, identity, version or signature validation failures leave the old app untouched. Handled installation failures roll back the bundle swap and restore prior owned integration bytes.
+
+A successful installation retains the old app in a private sibling folder:
+
+```text
+<Applications folder>/.Terminal-Helper-update-<UUID>/Terminal Helper.app
+```
+
+That folder also contains `RECOVERY.txt`. Keep it until the new app works. After quitting the app, open the matching folder in Finder using **Go → Go to Folder** and follow those instructions. App backups are separate from downloaded DMGs and `.zshrc` backups.
+
+The bundle swap is atomic, but app and integration are not one guaranteed transaction across a crash or power loss. An interrupted operation may require manual recovery from the retained backup. On restart, integration mismatch checks prevent claiming stale integration is ready. See [troubleshooting](TROUBLESHOOTING.md).
+
+If macOS blocks reopening, the updater must not bypass it. Users trusting the exact download may need Apple's per-app approval again. Never override malware/damaged-app warnings or managed restrictions, disable Gatekeeper globally or remove quarantine.
 
 ## Trust and privacy
 
@@ -28,8 +52,8 @@ Requests occur only after an explicit action, including while suggestions are Of
 
 Metadata is limited to 512 KiB, checksums to 16 KiB and the DMG to 64 MiB. HTTPS origins, exact repository/tag paths, numeric versions, unique asset selection, upload state and sizes are validated. Redirects stay within allowed GitHub HTTPS endpoints; TLS verification is not overridden. Streaming bounds and timeouts apply.
 
-SHA-256 is checked before saving/opening. A mismatch fails closed. Both archives and checksums rely on this GitHub repository account and HTTPS; they cannot independently protect against a compromised repository or establish Developer ID trust.
+SHA-256 is checked before a downloaded image is used. The staged app's expected bundle identity, release version and signature integrity are also validated before installation. A mismatch fails closed. Both archives and checksums rely on this GitHub repository account and HTTPS; they cannot independently protect against a compromised repository or establish Developer ID trust.
 
-Saved files have mode 600 inside a unique mode-700 folder; existing downloads are not overwritten. Quarantine is applied before success, not stripped to avoid Gatekeeper.
+Saved files have mode 600 inside a unique mode-700 folder; existing downloads are not overwritten. Quarantine is preserved through installation and reopening through macOS Launch Services, not stripped to avoid Gatekeeper.
 
 This free ad-hoc-signed beta has no Apple-verified identity or notarization. Managed Macs may refuse it. Offline fixture tests and real URLSession delegate tests do not replace a browser/Finder/native-terminal upgrade on an authorized Mac.
