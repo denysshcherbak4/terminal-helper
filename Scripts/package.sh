@@ -30,7 +30,9 @@ This beta is ad-hoc signed. It has no Developer ID signature or Apple
 notarization. Download only from the project's published GitHub release and
 verify its checksum before trusting it.
 
-1. Drag Terminal Helper.app to Applications, then open it from Applications.
+1. Drag Terminal Helper.app to Applications inside your home folder (~/Applications)
+   for updates without an administrator password, then open it from there.
+   /Applications also works if your account owns the app and can write there.
 2. If you trust this unmodified download and macOS reports an unidentified
    developer or that Apple cannot check the app, after trying to open it use
    System Settings > Privacy & Security > Open Anyway, then confirm Open.
@@ -41,9 +43,11 @@ verify its checksum before trusting it.
    open a new terminal window, and enable suggestions. Choose Home folder unless
    you configured a custom ZDOTDIR.
 
-Updating an existing installation: choose Disable and Quit, replace the app in
-Applications, reopen it, choose Update shell integration if prompted, and restart
-open terminal shells. Update checks are manual; no background polling occurs.
+Updating 0.2: one final manual replacement is needed to acquire the new updater.
+From 0.3 onward use terminal-helper update or Check for Updates / Install Update.
+Requested installation verifies the download, replaces the app and owned integration,
+keeps a recovery copy, and reopens through macOS security checks. Restart terminal
+windows and enable suggestions afterward. No background polling or sudo is used.
 
 This disk image does not install or execute anything automatically.
 HELP

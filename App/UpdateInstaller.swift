@@ -183,6 +183,7 @@ enum UpdateInstaller {
         try targetAllowed(target, applications: applications)
         try validateBundle(staged, version: version)
         let oldVersion = try bundleVersion(target)
+        try validateBundle(target, version: oldVersion)
         guard let old = ReleaseVersion(oldVersion), let new = ReleaseVersion(version), new > old else {
             throw fail("Only a newer published version can replace the installed app.")
         }
@@ -275,12 +276,12 @@ enum UpdateInstaller {
         let snapshot = workspace.appendingPathComponent("verified.dmg")
         try bytes.write(to: snapshot, options: .withoutOverwriting)
         guard chmod(snapshot.path, 0o600) == 0 else { throw fail("Could not protect the verified disk image.") }
-        try command("/usr/bin/hdiutil", ["attach", snapshot.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path, "-quiet"])
         var mounted = true
         defer {
             if mounted { try? command("/usr/bin/hdiutil", ["detach", mount.path, "-quiet"]) }
             try? manager.removeItem(at: snapshot)
         }
+        try command("/usr/bin/hdiutil", ["attach", snapshot.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path, "-quiet"])
         let candidate = mount.appendingPathComponent("Terminal Helper.app")
         try validateBundle(candidate, version: version)
         let staged = workspace.appendingPathComponent("Terminal Helper.app")

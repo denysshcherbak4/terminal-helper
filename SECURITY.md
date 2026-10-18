@@ -8,7 +8,7 @@ Include the exact app/commit version, macOS/zsh versions, expected behavior, a m
 
 ## Supported scope
 
-The current 0.2.x community beta and main branch are the reviewed scope. A passing CI build is not a claim of public-release readiness or complete security.
+The current published community beta and main branch are the reviewed scope. A passing CI build is not a claim of public-release readiness or complete security.
 
 Security properties:
 - Completion must not evaluate or execute typed input. Accepting a suggestion edits text only; execution is a separate action.
@@ -28,7 +28,7 @@ CI runs unprivileged project code only on disposable GitHub-hosted macOS runners
 
 ## Update trust boundary
 
-Only explicit menu/terminal update actions contact GitHub, including while suggestions are Off. There are no timers/startup requests. Version, origin, redirect, size and checksum validation is bounded; downloaded DMGs retain quarantine and never execute or self-install code. Both checksums and assets trust this repository account and HTTPS, not an independent publisher identity. See [updates](Docs/UPDATES.md).
+Only explicit menu/terminal update actions contact GitHub, including while suggestions are Off. There are no timers/startup requests. Version, origin, redirect, size and checksum validation is bounded; downloaded DMGs retain quarantine. From 0.3, explicit installation revalidates published checksums, mounts a private snapshot read-only, verifies bundle identity/version/signature without executing downloaded code, and atomically exchanges only the supported writable app path. Existing owned integration data is upgraded without sourcing it or editing shell configuration; handled failures roll back, and a recovery copy is retained. Reopening goes through Launch Services and may require macOS approval. No elevation or quarantine removal is performed. Both checksums and assets trust this repository account and HTTPS, not an independent publisher identity. See [updates](Docs/UPDATES.md).
 
 ## Review limits
 
