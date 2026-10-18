@@ -29,7 +29,7 @@ Check for Updates in the menu bar or Settings contacts GitHub only when you requ
 
 When a newer published release exists, Download Update verifies the disk image against its published checksum. Choose Open Disk Image explicitly, then Disable and Quit before dragging the new app to Applications and replacing the previous copy. Reopen it, choose Update shell integration if shown, and restart your terminal shells. The app never replaces itself, removes quarantine, or changes security settings.
 
-You can also use terminal-helper --version, terminal-helper --check-for-updates, and terminal-helper --update after installing the current shell integration. The update command downloads and verifies; installation remains a deliberate Finder action.
+You can also use terminal-helper version, terminal-helper check, and terminal-helper update after installing the current shell integration. The update command downloads and verifies; installation remains a deliberate Finder action.
 
 TROUBLESHOOTING
 If Enable suggestions is unavailable, install or update shell integration first and wait for it to finish. When an installed script differs from this app's bundled version, Update shell integration is the primary action. Off remains available even when the integration is outdated.
