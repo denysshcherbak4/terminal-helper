@@ -18,6 +18,19 @@ The MVP workflow runs on GitHub-hosted macOS 15 Apple Silicon and Intel, with co
 
 At [12f8e781](https://github.com/denysshcherbak4/terminal-helper/commit/12f8e78193dcc9a166da32c0c703e36af8f30175), [strict CI](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39042291494) passed 29 PTY cases (one default-filesystem skip), four installer cases, and the dedicated HFSX case on each architecture. Universal compilation, state and actual controller/worker-group lifecycle checks passed. A successful PNG export alone did not prove visual correctness; the exporter now also rejects blank/transparent pixels, and the final PR records the visual inspection of the replacement.
 
+## Upcoming 0.3 verification
+
+Version 0.3 adds explicit in-place installation. The following describes the checks to record, **not a claim that the final 0.3 run or native upgrade has passed**. Use the final exact source commit and complete ARM/Intel jobs before publishing results.
+
+- `Tests/Updates` compiles with `State.swift`, `Updates.swift` and `UpdateInstaller.swift` and retains the release/network/download/checksum/quarantine boundary checks.
+- `Tests/UpdateInstaller` creates signed fixture bundles and a verified fixture DMG. It covers identity/version/signature refusal, supported paths, permissions, owned integration, locks/concurrent edits, atomic bundle exchange, rollback checkpoints, cancellation, quarantine and retained backup. Fixture integration is treated as data, not executed.
+- After building, `Tests/UpdateController` receives the built app path, opens a CI-built copy through Launch Services, requests the actual controller to quit and checks process exit and Off. This is an unquarantined fixture, not proof that macOS will approve a downloaded ad-hoc app.
+- Native `--termination-self-test` and `--update-cancel-self-test` check external termination and cancellation of update/integration workers. The existing shell, Settings, state, lifecycle and appearance checks remain required.
+
+These commands run only on disposable remote macOS runners with empty user Applications/support fixture paths and no running Terminal Helper instance. The full installer and controller fixtures use the account's actual home; never clear a real installation to satisfy their guards. See [reproducible commands](../README.md#verification-and-development).
+
+Installed users can explicitly run `terminal-helper version`, `terminal-helper check` and `terminal-helper update` without an account or build tools. Version/check/update do not forward arbitrary arguments, and checks/downloads happen only on request. A 0.2 user still needs one manual Finder upgrade to 0.3 before subsequent in-place updates. Public-download trust, per-app opening approval, restart/re-enable and interrupted-update recovery remain separate manual checks; do not substitute fixture counts or historical timing values for them.
+
 ## Measurement method
 
 Startup: 40 paired fresh `zsh -d -f -i` subprocesses per condition, with identical `compinit -D`; alternating order reduces systematic cache bias. Report baseline/integrated p95 and p95 of paired added time. First observations are recorded separately; no filesystem cache flush is performed. A supplementary in-process EPOCHREALTIME measurement brackets source alone and excludes compinit and scheduling outside that phase; it does not replace the paired startup measurement.

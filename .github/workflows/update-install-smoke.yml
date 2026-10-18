@@ -1,0 +1,25 @@
+name: Public update installation smoke
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  install:
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build current updater as an older-version fixture
+        env:
+          VERSION: 0.1.0
+        run: bash Scripts/build.sh
+      - name: Install the published release through the production CLI
+        run: python3 Tests/Updates/test_public_install.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Public-update-installation-${{ github.sha }}
+          path: results/
+          if-no-files-found: error

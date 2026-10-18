@@ -1,15 +1,18 @@
 # Publish a version
 
-Repository edits do not update installed users. They explicitly check the latest published, non-prerelease version.
+Repository edits do not update installed users. They explicitly check the latest published, non-prerelease version. Version **0.3.0** adds in-place installation for subsequent updates; a 0.2 client needs one final manual Finder upgrade.
 
-1. Change the default numeric X.Y.Z in Scripts/build.sh and the README download/version links. Never reuse a published version for different bytes.
-2. Review the PR and complete ARM/Intel CI: shell/installer/update tests, native checks, renders, package verification and measured target misses. A Terminal.app step can explicitly SKIP.
+1. Set the default numeric version in Scripts/build.sh to **0.3.0** for this release. Never reuse a published version for different bytes. Keep the public README 0.2 link until the new release asset exists.
+2. Review the PR and complete ARM/Intel CI: shell/installer/update tests, staged app identity/version/signature validation, supported-path/permission refusal, bundle/integration swap and handled-error rollback, native checks, renders, package verification and measured target misses. A Terminal.app step can explicitly SKIP.
 3. Select one exact-source CI artifact. Both runner packages are universal; never mix archives/checksums from different runs. Verify SHA256SUMS.txt.
 4. Prepare a draft Release tagged vX.Y.Z at that exact tested commit, titled Terminal Helper X.Y.Z — community beta. Disclose ad-hoc signing, no Developer ID/notarization and manual-validation limits.
 5. Attach Terminal-Helper-X.Y.Z-universal.dmg, its .sha256 file, the app ZIP and SHA256SUMS.txt. The updater needs exactly one matching DMG and one checksum file.
 6. Record applicable manual checks. Public publication requires maintainer approval.
 7. After approval, publish with **Set as the latest release**, not GitHub's prerelease flag. The title/body still say community beta. The updater deliberately follows /releases/latest, which excludes prereleases.
-8. Verify the README download and public latest-release API. On an authorized Mac, test updating from the prior version, quarantine, deliberate Finder replacement, integration update and restarted shells.
+8. Verify the public latest-release API and download. Update the README link/version and remove its forthcoming-release wording only after the asset is available.
+9. On an authorized Mac, verify the final manual 0.2→0.3 upgrade, opening approval, integration repair and restarted shells. For a subsequent approved newer release, verify explicit automatic installation at ~/Applications, Off-before-quit, retained backup/RECOVERY.txt, integration consistency, Launch Services reopening and manual recovery. Fixtures do not replace this native user flow.
+
+Automatic installation must not elevate or fall back to another destination. It supports exactly ~/Applications/Terminal Helper.app or an eligible user-owned /Applications/Terminal Helper.app. Validation failures leave the old app untouched; handled installation errors roll back. Retain the backup because app and integration are not a guaranteed transaction across a crash or power loss. Quarantine and macOS opening checks remain in effect.
 
 No paid Apple account is required to distribute this ad-hoc beta; it does not gain Developer ID trust or notarization. Explain [Apple's per-app approval](https://support.apple.com/102445); never globally disable Gatekeeper, strip quarantine or override malware/damaged-app warnings. Some users and managed Macs cannot run the beta.
 

@@ -9,14 +9,14 @@
 **Free community beta · macOS 13+ · Apple Silicon and Intel · no Xcode, Python, Node, or app account**
 
 1. Download the **DMG** from this repository's release. Public downloads require no GitHub sign-in.
-2. Open it and drag **Terminal Helper** to **Applications**. If your account cannot write there, use **Applications inside your home folder** instead.
+2. Open it and drag **Terminal Helper** to **Applications inside your home folder** (`~/Applications`; create it in Finder if needed). This is recommended for updates without administrator rights. `/Applications` also works when your account owns and can write this app.
 3. Open Terminal Helper. This free build is **ad-hoc signed, not notarized**. If macOS blocks it as an unidentified developer and you trust the exact download, use **System Settings → Privacy & Security → Open Anyway**, then confirm **Open**. [Apple explains this per-app approval](https://support.apple.com/102445).
 4. Click **>_ menu-bar icon → Settings → Install shell integration**. Choose Home unless you configured a custom ZDOTDIR.
 5. Open a **new terminal window**, then enable suggestions. **Tab** suggests, **arrows** select, **Enter** accepts text, **Escape** cancels. A separate Enter executes.
 
 A free signature does not identify the publisher to Apple or provide malware notarization. Never override a malware/damaged-app warning, globally disable Gatekeeper or remove quarantine. Per-app approval may be needed again after an update and can be unavailable on managed Macs. [Installation help](Docs/INSTALLATION.md)
 
-The download becomes available when the maintainer publishes v0.2.0. If it is not listed on the release page yet, [green CI builds](https://github.com/denysshcherbak4/terminal-helper/actions/workflows/macos.yml?query=branch%3Amain) remain available for technical review; those require GitHub sign-in.
+The public download above is v0.2.0. **Version 0.3.0 with subsequent in-place updates is being prepared on this branch; it is not a published download yet.** [Green CI builds](https://github.com/denysshcherbak4/terminal-helper/actions/workflows/macos.yml?query=branch%3Amain) remain available for technical review and require GitHub sign-in.
 
 ## Update without building anything
 
@@ -28,9 +28,11 @@ terminal-helper check
 terminal-helper update
 ```
 
-The update command downloads the latest published version, verifies its SHA-256 checksum, preserves macOS download quarantine, and opens the DMG. Then **Disable and Quit**, replace the app in the same Applications folder, reopen it, and choose **Update shell integration** if prompted. Restart terminal windows afterward.
+**Already using v0.2? One final manual upgrade is required.** When v0.3 is published, the old update command verifies and opens its DMG. Disable and Quit, replace the app in Finder, reopen, update integration if prompted and restart shells. The installed v0.2 command cannot acquire new behavior merely because this repository changed.
 
-It does not silently replace or execute a downloaded app. Repository commits alone do not update anyone: a maintainer must publish a new version. There are no timers, startup checks or automatic downloads. [Update details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
+**In v0.3 and later**, an explicit update action verifies and installs a newer app in place at `~/Applications/Terminal Helper.app` or an eligible user-owned `/Applications/Terminal Helper.app`. It retains an app backup, refreshes exact owned integration data without editing `.zshrc` or settings, and reopens through macOS Launch Services. **Suggestions remain Off: restart shells, then enable them.** Unsupported locations or permissions are refused without elevation. macOS approval may still be required.
+
+There are no timers, startup checks or background downloads. A maintainer must publish a new version before it is offered. Validation failures leave the installed app untouched; handled installation failures roll back. A retained backup supports interrupted-update recovery without promising a crash-proof app-and-integration transaction. [Update and recovery details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
 
 <details>
 <summary>See the native app</summary>
@@ -61,7 +63,7 @@ Acceptance edits the buffer without executing it. Unsupported expressions retain
 
 ## Remove it
 
-Choose **Uninstall shell integration** in Settings using the original configuration folder. Restart shells, then delete the app. Unrelated configuration and uniquely named backups remain intact. Downloaded update folders in Downloads can be deleted separately.
+Choose **Uninstall shell integration** in Settings using the original configuration folder. Restart shells, then delete the app. Unrelated configuration and uniquely named backups remain intact. Downloaded update folders and retained `.Terminal-Helper-update-<UUID>` app-backup folders beside the app can be deleted separately when no longer needed.
 
 Install/repair/uninstall are repeatable, serialize their own operations and refuse unsafe or detected changed targets. A busy/stale lock is refused rather than stolen; see [recovery](Docs/TROUBLESHOOTING.md).
 
@@ -77,24 +79,32 @@ Only a requested update contacts GitHub/CDN, which sees normal request metadata 
 
 [CI, measurements and compatibility](Docs/VERIFICATION.md) · [Architecture](Docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](Docs/ROADMAP.md)
 
-ARM/Intel macOS CI covers actual PTY/ZLE interaction, installer recovery, management-command quoting, update metadata/network/checksum bounds, private files and quarantine, native state/Settings/lifecycle, rendered appearance and DMG verification. A skipped Terminal.app test is not native-terminal validation.
+ARM/Intel macOS CI covers actual PTY/ZLE interaction, installer recovery, management-command quoting, update metadata/network/checksum bounds, private files and quarantine, native state/Settings/lifecycle, installer validation/swap/rollback fixtures, rendered appearance and DMG verification. A skipped Terminal.app test is not native-terminal validation.
 
 Targets remain added startup p95 ≤30 ms and first useful suggestion p95 ≤100 ms. Historical runs missed startup and unconfigured-first-use targets. Exact-source artifacts include raw logs/measurements; a green build does not establish Apple trust or every native user flow.
 
-Build on a disposable macOS development machine or remote runner:
+Run these commands **only on a disposable remote macOS runner**, with no running Terminal Helper instance, no existing `~/Applications/Terminal Helper.app` and no `~/Library/Application Support/Terminal Helper`. The updater fixtures create and remove data in the runner account's **actual home**, not just a temporary directory. Do not remove a real installation to satisfy their guards, and do not run them on a personal Mac. A GUI session is needed for the controller handoff.
 
 ```sh
 bash Scripts/build.sh
 python3 Tests/Shell/test_pty.py
 python3 Tests/Shell/test_install.py
 python3 Tests/Shell/test_cli.py
-swiftc App/Updates.swift Tests/Updates/main.swift -o build/update-tests -framework AppKit -framework CoreServices
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/Updates/main.swift -o build/update-tests -framework AppKit -framework CoreServices
 build/update-tests
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateInstaller/main.swift -o build/update-installer-tests -framework AppKit -framework CoreServices
+build/update-installer-tests
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateController/main.swift -o build/update-controller-tests -framework AppKit -framework CoreServices
+build/update-controller-tests "$PWD/dist/Terminal Helper.app"
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --settings-self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test
+"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --termination-self-test
+"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --update-cancel-self-test
 python3 Tests/Performance/measure.py
 bash Scripts/package.sh
 ```
+
+The controller fixture runs **after the app build** and opens an unquarantined CI-built copy through Launch Services. This verifies the quit/Off handoff, not a downloaded app's Gatekeeper approval. The standalone update test programs all require the three shared Swift sources shown above. Record results only from the final exact-source complete CI run.
 
 The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in Assets/ and App/Icon.swift. Licensed under [MIT](LICENSE).

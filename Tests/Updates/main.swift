@@ -83,7 +83,7 @@ let networkError: Result<UpdateCheck, Error> = wait { callback in
 }
 if case .failure = networkError { checks += 1 } else { expect(false, "HTTP failure not up to date") }
 let fetched: Result<UpdateCheck, Error> = wait { callback in
-    TerminalUpdates.check(fetch: { url, limit, done in
+    TerminalUpdates.check(current: "0.2.0", fetch: { url, limit, done in
         expect(url == TerminalUpdates.catalogURL && limit == 512 * 1024, "only fixed release catalog")
         done(.success(catalog()))
     }, completion: callback)

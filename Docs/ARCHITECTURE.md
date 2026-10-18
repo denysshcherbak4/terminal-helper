@@ -34,4 +34,12 @@ CI runs on GitHub-hosted macOS and uploads a versioned universal test build and 
 
 ## Explicit updates
 
-App/Updates.swift performs fixed public-release checks, bounded HTTPS downloads, SHA-256 verification, private saving and quarantine. Only explicit menu/terminal actions make requests. The terminal command delegates to the installed app through private, non-executable app-path metadata, never evaluated or used to forward arbitrary arguments. A verified DMG opens for deliberate Finder replacement; no app self-installation occurs. See UPDATES.md and RELEASING.md.
+`App/Updates.swift` performs fixed public-release checks, bounded HTTPS downloads, SHA-256 verification, private saving and quarantine. Only explicit menu/terminal actions make requests. The terminal command delegates fixed subcommands through private, non-executable `app-path` metadata, never evaluated or used to forward arbitrary arguments.
+
+Version 0.2 verifies and opens a DMG for Finder replacement. The 0.3 installer validates the staged app's expected bundle identity, release version and signature integrity. It installs only at the canonical home Applications path or an eligible user-owned system Applications path, without elevation or a fallback destination.
+
+After validation, the GUI is requested to persist Off and quit. Atomic bundle exchange keeps the target occupied and retains the old app in a private sibling `.Terminal-Helper-update-<UUID>` folder with `RECOVERY.txt`. Existing integration data is upgraded only when exact and owned; `.zshrc` and settings are not rewritten. Handled errors swap the app back and restore prior integration bytes. The app and integration do not form a guaranteed transaction across a crash or power loss; backups and startup mismatch checks support recovery.
+
+After integration refresh, the installed app reopens through Launch Services and remains Off. Existing shells must restart before enabling suggestions. Quarantine and macOS opening checks remain effective; an ad-hoc signature establishes integrity, not Apple-verified publisher identity or notarization. There is no startup checker or background installation.
+
+See [updates](UPDATES.md) and [release procedure](RELEASING.md). A 0.2 user must manually install 0.3 once before subsequent automatic updates are available.

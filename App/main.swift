@@ -4,6 +4,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let state: SuggestionState
     private let lifecycleRoot: URL?
     private var quitting = false
+    private var pendingTerminationReply = false
+    private var updateInstaller: IntegrationWorker?
+    private var cancelUpdateOnQuit = false
+    private var lifecycleTestMode: Bool {
+        CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--termination-self-test") || CommandLine.arguments.contains("--update-cancel-self-test")
+    }
     init(lifecycleRoot: URL? = nil) {
         self.lifecycleRoot = lifecycleRoot
         self.state = lifecycleRoot.map { SuggestionState(parent: $0) } ?? SuggestionState()
@@ -32,6 +38,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsVersion: NSTextField?
     private var worker: IntegrationWorker?
     private var lifecycleChild: pid_t?
+    private var lifecycleUpdateChild: pid_t?
     private var configurationDirectory = UserDefaults.standard.string(forKey: "ShellConfigurationDirectory").map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -42,7 +49,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSApp.appearance = NSAppearance(named: value == "dark" ? .darkAqua : .aqua)
         }
         if NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.denysshcherbak4.terminal-helper").count > 1 {
-            NSApp.terminate(nil); return
+            // Closing an extra controller must not disable the existing instance.
+            quitting = true; NSApp.terminate(nil); return
         }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = terminalGlyph(size: 22)
@@ -76,7 +84,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         NSApp.mainMenu = mainMenu
         refresh()
-        if (!integrationInstalled || integrationNeedsUpdate) && CommandLine.arguments.count == 1 { showSettings() }
+        if CommandLine.arguments.contains("--updated") {
+            operationStatus = "Update installed. Restart terminal windows, then enable suggestions."
+            showSettings()
+        } else if (!integrationInstalled || integrationNeedsUpdate) && CommandLine.arguments.count == 1 { showSettings() }
         if lifecycleRoot != nil {
             DispatchQueue.main.async {
                 if CommandLine.arguments.contains("--settings-self-test") { self.settingsSelfTest() }
@@ -164,8 +175,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let setupTitle = !installed ? "Install shell integration…" : (needsUpdate ? "Update shell integration…" : "Repair shell integration…")
         status.title = "Suggestions: \(enabled ? "On" : "Off")"
         toggle.state = enabled ? .on : .off
-        toggle.isEnabled = enabled || (worker == nil && ((installed && !needsUpdate) || CommandLine.arguments.contains("--lifecycle-test")))
-        setupMenuItem?.isEnabled = worker == nil
+        toggle.isEnabled = enabled || (worker == nil && updateInstaller == nil && ((installed && !needsUpdate) || lifecycleTestMode))
+        setupMenuItem?.isEnabled = worker == nil && updateInstaller == nil
         setupMenuItem?.title = setupTitle
         integration.title = !installed ? "Shell integration: not installed" : (needsUpdate ? "Shell integration: update required" : "Integration file current; restart shells")
         item.button?.setAccessibilityValue(enabled ? "On" : "Off")
@@ -176,16 +187,16 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsOperation?.stringValue = operationStatus
         settingsOperation?.isHidden = operationStatus.isEmpty
         installButton?.title = setupTitle
-        installButton?.isEnabled = worker == nil
-        uninstallButton?.isEnabled = installed && worker == nil
+        installButton?.isEnabled = worker == nil && updateInstaller == nil
+        uninstallButton?.isEnabled = installed && worker == nil && updateInstaller == nil
         updateMenuItem?.isEnabled = !updateBusy
         updateButton?.isEnabled = !updateBusy
         settingsUpdateStatus?.stringValue = updateStatus
         settingsUpdateStatus?.isHidden = updateStatus.isEmpty
     }
     @objc private func changeEnabled() {
-        if !state.enabled(), !CommandLine.arguments.contains("--lifecycle-test"), !integrationInstalled || integrationNeedsUpdate || worker != nil {
-            operationStatus = worker != nil ? "Wait for shell integration to finish." : (integrationNeedsUpdate ? "Update shell integration before enabling suggestions, then restart open shells." : "Install shell integration before enabling suggestions.")
+        if !state.enabled(), !lifecycleTestMode, !integrationInstalled || integrationNeedsUpdate || worker != nil || updateInstaller != nil {
+            operationStatus = updateInstaller != nil ? "Wait for the app update to finish." : (worker != nil ? "Wait for shell integration to finish." : (integrationNeedsUpdate ? "Update shell integration before enabling suggestions, then restart open shells." : "Install shell integration before enabling suggestions."))
             showSettings(); return
         }
         do { try state.write(enabled: !state.enabled()); operationStatus = ""; refresh() }
@@ -225,9 +236,18 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             try FileManager.default.removeItem(at: root)
         } catch { fputs("Settings test failed: isolated fixture could not be updated.\n", stderr); exit(1) }
         print("PASS native Settings: setup and upgrade guards, On/Off controls, version and manual update availability (no network)")
+        quitting = true
         NSApp.terminate(nil)
     }
     private func lifecycleTest() {
+        if CommandLine.arguments.contains("--termination-self-test") {
+            let watchdog = Timer(timeInterval: 15, repeats: false) { _ in
+                fputs("External quit test timed out waiting for deferred termination.\n", stderr)
+                exit(124)
+            }
+            RunLoop.main.add(watchdog, forMode: .default)
+            RunLoop.main.add(watchdog, forMode: .modalPanel)
+        }
         guard !state.enabled() else { exit(1) }
         changeEnabled()
         guard state.enabled(), toggle.state == .on else { exit(1) }
@@ -245,26 +265,46 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard self.quitting else { fputs("Lifecycle failed: worker exited before Quit.\n", stderr); exit(1) }
                 self.finishQuit()
             }
+            if CommandLine.arguments.contains("--update-cancel-self-test") {
+                updateInstaller = try IntegrationWorker(arguments: ["-f", "-c", program, "update-cancel-test", root.appendingPathComponent("update-child-pid").path], environment: ["PATH": "/usr/bin:/bin"]) { _ in
+                    self.updateInstaller = nil
+                    guard self.quitting else { fputs("Lifecycle failed: update test worker exited before Quit.\n", stderr); exit(1) }
+                    self.finishQuit()
+                }
+            }
             waitForLifecycleChild(attempts: 100)
         } catch { fputs("Lifecycle failed: cannot start owned test worker.\n", stderr); exit(1) }
     }
     private func waitForLifecycleChild(attempts: Int) {
-        if let root = lifecycleRoot,
-           let text = try? String(contentsOf: root.appendingPathComponent("child-pid"), encoding: .utf8),
-           let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 {
-            lifecycleChild = pid
-            disableAndQuit()
+        func readPID(_ name: String) -> pid_t? {
+            guard let root = lifecycleRoot,
+                  let text = try? String(contentsOf: root.appendingPathComponent(name), encoding: .utf8),
+                  let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 0 else { return nil }
+            return pid
+        }
+        let updateChild = readPID("update-child-pid")
+        if let child = readPID("child-pid"), !CommandLine.arguments.contains("--update-cancel-self-test") || updateChild != nil {
+            lifecycleChild = child; lifecycleUpdateChild = updateChild
+            if CommandLine.arguments.contains("--termination-self-test") {
+                // terminateLater enters a modal loop; do not hold a main GCD block open.
+                fputs("External quit test: scheduling an AppKit run-loop request.\n", stderr)
+                RunLoop.main.perform(inModes: [.default, .modalPanel]) {
+                    fputs("External quit test: requesting termination.\n", stderr)
+                    NSApp.terminate(nil)
+                }
+            } else { disableAndQuit() }
         } else if attempts > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { self.waitForLifecycleChild(attempts: attempts - 1) }
         } else {
-            worker?.terminate()
+            worker?.terminate(); updateInstaller?.terminate()
             fputs("Lifecycle failed: owned test child did not start.\n", stderr); exit(1)
         }
     }
     private func finishQuit() {
+        guard worker == nil, !cancelUpdateOnQuit || updateInstaller == nil else { return }
         if let root = lifecycleRoot {
             guard !state.enabled() else { fputs("Lifecycle failed: Quit left state On.\n", stderr); exit(1) }
-            if let child = lifecycleChild {
+            for child in [lifecycleChild, lifecycleUpdateChild].compactMap({ $0 }) {
                 guard kill(child, 0) == -1, errno == ESRCH else {
                     fputs("Lifecycle failed: owned child survived Quit.\n", stderr); exit(1)
                 }
@@ -273,15 +313,46 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             catch { fputs("Lifecycle failed: temporary state cleanup failed.\n", stderr); exit(1) }
             print("PASS controller lifecycle: On, Off, re-enable, Disable and Quit writes Off and terminates owned worker group")
         }
-        NSApp.terminate(nil)
+        if pendingTerminationReply {
+            pendingTerminationReply = false
+            if CommandLine.arguments.contains("--termination-self-test") { fputs("External quit test: owned group reaped; replying to deferred termination.\n", stderr) }
+            NSApp.reply(toApplicationShouldTerminate: true)
+        } else { NSApp.terminate(nil) }
     }
-    @objc private func disableAndQuit() {
-        guard !quitting else { return }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if quitting {
+            if worker != nil || (cancelUpdateOnQuit && updateInstaller != nil) {
+                pendingTerminationReply = true
+                return .terminateLater
+            }
+            return .terminateNow
+        }
         do {
             try state.write(enabled: false)
             quitting = true
-            if let worker = worker, worker.isRunning { worker.terminate() }
-            else { finishQuit() }
+            refresh()
+            if let worker = worker, worker.isRunning {
+                pendingTerminationReply = true
+                if CommandLine.arguments.contains("--termination-self-test") { fputs("External quit test: waiting for owned group termination.\n", stderr) }
+                worker.terminate()
+                return .terminateLater
+            }
+            return .terminateNow
+        } catch {
+            report("Could not disable safely", detail: "Terminal Helper will stay open. " + String(describing: error))
+            return .terminateCancel
+        }
+    }
+    @objc private func disableAndQuit() {
+        guard !quitting || !cancelUpdateOnQuit else { return }
+        do {
+            try state.write(enabled: false)
+            quitting = true; cancelUpdateOnQuit = true
+            if updateInstaller != nil { updateStatus = "Cancelling the update before quitting…" }
+            refresh()
+            worker?.terminate()
+            updateInstaller?.terminate(gracePeriod: 15)
+            finishQuit()
         } catch { report("Could not disable safely", detail: "Terminal Helper will stay open. " + String(describing: error)) }
     }
     @objc private func showSettings() {
@@ -381,7 +452,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.refresh()
                     let alert = NSAlert()
                     alert.messageText = "Terminal Helper " + offer.version + " is available"
-                    alert.informativeText = "This free beta is ad-hoc signed, without Developer ID or Apple notarization. Downloading verifies its published checksum; it does not install or replace the app. See Help for Apple's per-app Open Anyway process if you trust this download."
+                    alert.informativeText = "This free beta is ad-hoc signed, without Developer ID or Apple notarization. Downloading verifies its published checksum. You will be asked before installation closes and replaces this app. macOS may require approval when reopening it."
                     alert.addButton(withTitle: "Download Update"); alert.addButton(withTitle: "Not Now")
                     if alert.runModal() == .alertFirstButtonReturn { self.downloadUpdate(offer) }
                 }
@@ -400,22 +471,53 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.updateStatus = error.localizedDescription
                     self.refresh(); self.report("Could not download update", detail: self.updateStatus)
                 case .success(let url):
-                    self.updateStatus = "Update downloaded and checksum verified. Quit before replacing the app."
+                    self.updateStatus = "Update downloaded and checksum verified. Ready to install."
                     self.refresh()
                     let alert = NSAlert()
-                    alert.messageText = "Update downloaded and verified"
-                    alert.informativeText = "Open the disk image, choose Disable and Quit in Terminal Helper, then drag the new app to Applications and replace the old copy. Reopen Terminal Helper, choose Update shell integration if prompted, and restart open terminal shells. This app will not replace itself or change macOS security settings."
-                    alert.addButton(withTitle: "Open Disk Image"); alert.addButton(withTitle: "Not Now")
-                    if alert.runModal() == .alertFirstButtonReturn, !NSWorkspace.shared.open(url) {
-                        self.updateStatus = "The verified disk image could not be opened. Try again from its download folder."
-                        self.refresh(); self.report("Could not open disk image", detail: self.updateStatus)
-                    }
+                    alert.messageText = "Install Terminal Helper " + offer.version + "?"
+                    alert.informativeText = "Installation will turn suggestions Off, close this app, replace it in the same location, update the owned shell integration, and reopen Terminal Helper. Restart open terminal shells afterward and enable suggestions again. A recovery copy is kept. macOS may ask you to approve reopening this ad-hoc beta; security settings and quarantine will not be changed."
+                    alert.addButton(withTitle: "Install Update"); alert.addButton(withTitle: "Not Now")
+                    if alert.runModal() == .alertFirstButtonReturn { self.installUpdate(disk: url, version: offer.version) }
                 }
             }
         }
     }
+    private func installUpdate(disk: URL, version: String) {
+        guard worker == nil, updateInstaller == nil else {
+            updateStatus = "Finish the current integration operation or update before installing."
+            refresh(); report("Installation is busy", detail: updateStatus); return
+        }
+        guard let executable = Bundle.main.executableURL else {
+            report("Could not start update", detail: "The current app executable is unavailable. Reinstall a complete app build."); return
+        }
+        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+        do {
+            updateBusy = true
+            updateStatus = "Preparing installation. Terminal Helper will close after validation."
+            // External updater-requested quit preserves this explicit replacement process;
+            // the user's Disable and Quit action cancels and reaps its whole owned group.
+            updateInstaller = try IntegrationWorker(executable: executable.path, arguments: ["--apply-update", disk.path, version], environment: environment) { status in
+                self.updateInstaller = nil
+                if self.quitting {
+                    if self.cancelUpdateOnQuit { self.finishQuit() }
+                    return
+                }
+                self.updateBusy = false
+                self.updateStatus = status == 0 ? "Update installed. Restart terminal shells and enable suggestions after reopening." : "The update could not complete. See Help for recovery."
+                self.refresh()
+                // The internal updater presents its own safe failure alert, including after GUI exit.
+            }
+            refresh()
+        } catch {
+            updateInstaller = nil; updateBusy = false
+            updateStatus = "The update process could not start. The current app remains open."
+            refresh(); report("Could not start update", detail: updateStatus)
+        }
+    }
+
     @objc private func installIntegration() { runIntegration("install") }
     @objc private func uninstallIntegration() {
+        guard worker == nil, updateInstaller == nil else { return }
         let alert = NSAlert(); alert.messageText = "Uninstall shell integration?"
         alert.informativeText = "Suggestions will be disabled and the owned shell configuration block and integration files removed. Open shells must be restarted."
         alert.addButton(withTitle: "Uninstall"); alert.addButton(withTitle: "Cancel")
@@ -424,7 +526,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         runIntegration("uninstall")
     }
     private func runIntegration(_ operation: String) {
-        guard worker == nil else { return }
+        guard worker == nil, updateInstaller == nil else { return }
         guard let script = Bundle.main.url(forResource: operation, withExtension: "zsh", subdirectory: "Integration") else {
             report("Integration unavailable", detail: "Reinstall this app from a complete build."); return
         }
@@ -479,7 +581,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try stateSelfTest(); exit(0) } catch { fputs("\(error)\n", stderr); exit(1) }
 }
 let application = NSApplication.shared
-let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
+let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test") || CommandLine.arguments.contains("--termination-self-test") || CommandLine.arguments.contains("--update-cancel-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
 let controller = Controller(lifecycleRoot: lifecycleRoot)
 application.delegate = controller
 application.run()
