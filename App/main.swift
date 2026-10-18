@@ -290,7 +290,13 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else { NSApp.terminate(nil) }
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if quitting { return .terminateNow }
+        if quitting {
+            if worker?.isRunning == true {
+                pendingTerminationReply = true
+                return .terminateLater
+            }
+            return .terminateNow
+        }
         do {
             try state.write(enabled: false)
             quitting = true
