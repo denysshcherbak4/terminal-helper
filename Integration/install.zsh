@@ -26,9 +26,19 @@ cleanup() {
 trap cleanup EXIT ZERR
 trap 'exit 1' HUP INT TERM
 [[ ! -L "$config" && ( ! -e "$config" || ( -f "$config" && -O "$config" ) ) ]] || exit 1
-for owned in "$base/integration.zsh" "$base/state"; do
+for owned in "$base/integration.zsh" "$base/state" "$base/app-path"; do
   [[ ! -L "$owned" && ( ! -e "$owned" || ( -f "$owned" && -O "$owned" ) ) ]] || exit 1
 done
+app_path=''
+if (( $+TERMINAL_HELPER_APP_PATH )); then
+  app_path=$TERMINAL_HELPER_APP_PATH
+  [[ "$app_path" == /*.app && "$app_path" != *[[:cntrl:]]* &&
+     -d "$app_path" && ! -L "$app_path" &&
+     -f "$app_path/Contents/MacOS/TerminalHelper" &&
+     ! -L "$app_path/Contents/MacOS/TerminalHelper" &&
+     -x "$app_path/Contents/MacOS/TerminalHelper" ]] ||
+    { print -u2 'Invalid app location; no shell configuration changes made.'; exit 1; }
+fi
 config_existed=0
 [[ ! -f "$config" ]] || config_existed=1
 replace_config() {
@@ -75,6 +85,13 @@ if [[ ! -e "$base/state" ]]; then
   tmp=$(/usr/bin/mktemp "$base/.state.XXXXXX")
   print -r -- 'terminal-helper-v1:off' > "$tmp"
   /bin/mv "$tmp" "$base/state"
+  tmp=''
+fi
+if [[ -n "$app_path" ]]; then
+  tmp=$(/usr/bin/mktemp "$base/.app-path.XXXXXX")
+  print -r -- "$app_path" > "$tmp"
+  /bin/chmod 600 "$tmp"
+  /bin/mv -f "$tmp" "$base/app-path"
   tmp=''
 fi
 print 'Integration installed. Open a new interactive zsh. Suggestions remain Off until enabled.'
