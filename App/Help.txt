@@ -22,14 +22,18 @@ Files, directories, executable names, and your existing command completions are 
 OFF AND QUIT
 Turn off Enable suggestions to stop assistance. Open shells check state at their next completion or acceptance. An existing completion menu may remain visible until that interaction. The idle menu-bar app stays resident while Off.
 
-Disable and Quit writes Off, terminates any app-owned installer workers, and exits. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
+Disable and Quit writes Off, terminates any shell integration installer workers, and exits. External app-quit requests use the same safe Off and worker-shutdown behavior. An explicitly started update process continues long enough to replace and reopen the app. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
 
 UPDATES
 Check for Updates in the menu bar or Settings contacts GitHub only when you request it. The current version is shown in both places. There is no automatic checking or background polling.
 
-When a newer published release exists, Download Update verifies the disk image against its published checksum. Choose Open Disk Image explicitly, then Disable and Quit before dragging the new app to Applications and replacing the previous copy. Reopen it, choose Update shell integration if shown, and restart your terminal shells. The app never replaces itself, removes quarantine, or changes security settings.
+When a newer published release exists, Download Update verifies the disk image against its published checksum. Choose Install Update to approve in-place installation. A short-lived process from the current app validates the update before asking the controller to quit. It turns suggestions Off, replaces the app in the same location, updates the owned shell integration, and asks macOS to reopen Terminal Helper. Shell integration installation or removal must finish before an app update can start.
 
-You can also use terminal-helper version, terminal-helper check, and terminal-helper update after installing the current shell integration. The update command downloads and verifies; installation remains a deliberate Finder action.
+Restart open terminal shells after the update, then enable suggestions again. The updater preserves quarantine and does not change macOS security settings, remove security attributes, or request administrator privileges. Because this beta is ad-hoc signed and not notarized, macOS may require your approval to reopen it; use Apple's per-app process above only if you trust the download.
+
+If installation cannot complete, the updater reports a safe error. A recovery copy of the old app and RECOVERY.txt are kept in a private sibling .Terminal-Helper-update-<UUID> folder beside the installed app. Follow those recovery instructions if reopening fails. An update cannot write a location you do not have permission to change.
+
+You can also use terminal-helper version, terminal-helper check, and terminal-helper update after installing the current shell integration. The update command downloads, verifies, and installs the latest newer published release; it can close the running controller and reopen the updated app. Run it only when you are ready to update.
 
 TROUBLESHOOTING
 If Enable suggestions is unavailable, install or update shell integration first and wait for it to finish. When an installed script differs from this app's bundled version, Update shell integration is the primary action. Off remains available even when the integration is outdated.
