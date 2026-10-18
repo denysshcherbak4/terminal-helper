@@ -1,7 +1,7 @@
 name: macOS MVP
 on:
   push:
-    branches: [main, feature/terminal-helper-mvp]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -62,6 +62,9 @@ jobs:
       - name: App state tests
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test | tee results/app-tests.txt'
+      - name: Native Settings tests
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --settings-self-test | tee results/settings-tests.txt'
       - name: Controller lifecycle test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test | tee results/lifecycle-tests.txt'
@@ -79,8 +82,9 @@ jobs:
         run: |
           version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'dist/Terminal Helper.app/Contents/Info.plist')
           ditto -c -k --sequesterRsrc --keepParent 'dist/Terminal Helper.app' "dist/Terminal-Helper-${version}-${SOURCE_SHA:0:12}-universal.zip"
+          bash Scripts/package.sh
           cd dist
-          shasum -a 256 *.zip > SHA256SUMS.txt
+          shasum -a 256 -c SHA256SUMS.txt
           du -sh 'Terminal Helper.app' >> ../results/environment.txt
           lipo -archs 'Terminal Helper.app/Contents/MacOS/TerminalHelper' >> ../results/environment.txt
           codesign -dv 'Terminal Helper.app' 2>> ../results/environment.txt
@@ -90,6 +94,8 @@ jobs:
           name: Terminal-Helper-${{ matrix.runner }}-${{ env.SOURCE_SHA }}
           path: |
             dist/*.zip
+            dist/*.dmg
+            dist/*.dmg.sha256
             dist/SHA256SUMS.txt
             results/
           if-no-files-found: error

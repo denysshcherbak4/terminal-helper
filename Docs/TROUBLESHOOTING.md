@@ -17,3 +17,6 @@
 **macOS does not trust the download.** The current engineering artifact has ad-hoc signing, no Developer ID identity and no notarization. Do not disable Gatekeeper. A signed and notarized build is needed for the intended normal public installation flow.
 
 **I want to uninstall.** Choose Uninstall shell integration in Settings and the original configuration folder, restart open shells, then delete the app. Missing state keeps any retained widgets disabled. Remove remaining owned support files only after those shells close; keep your backups if you may need them.
+
+
+**The installer says another operation is in progress.** Install and uninstall serialize edits with a private `.install-lock` directory. Wait for the operation to finish. A forced kill can leave a stale lock; do not automatically delete it or run two installers. Close Terminal Helper and confirm no installer is running before using `rmdir "$HOME/Library/Application Support/Terminal Helper/.install-lock"`. This removes only an empty owned lock. If it is nonempty or not yours, stop and inspect it; do not recursively delete the support folder. Then retry installation/repair.

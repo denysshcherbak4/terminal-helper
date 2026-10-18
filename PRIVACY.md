@@ -4,6 +4,8 @@ Terminal Helper has no accounts, telemetry, analytics, crash-upload service, clo
 
 The menu-bar controller reads/writes its private On/Off state, reports whether its integration file exists, and changes shell configuration only during an explicit install/uninstall action. The zsh integration examines the current completion context and nearby filesystem entries locally when enabled and completion is requested. It does not index the whole disk.
 
+The app remembers only the selected shell-configuration folder in its local macOS preference `ShellConfigurationDirectory` (domain `io.github.denysshcherbak4.terminal-helper`). This is a local filesystem path; it is not transmitted. Successful integration uninstall clears this preference.
+
 Local app-owned data lives in `~/Library/Application Support/Terminal Helper`: the integration, private state and transient installation lock. Installation backs up the selected .zshrc next to that file before editing its marked block. Backups contain the original configuration and stay on your device.
 
 Existing zsh history behavior and third-party completion definitions are controlled by your shell configuration. Such definitions can execute code or access the network independently of Terminal Helper; install only ones you trust.
