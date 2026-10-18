@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import CoreServices
+import Darwin
 
 enum UpdateFailure: Error, LocalizedError {
     case http(Int)
@@ -248,7 +249,9 @@ enum TerminalUpdates {
             ]
             try (file as NSURL).setResourceValue(properties, forKey: .quarantinePropertiesKey)
             let recorded = try (file as NSURL).resourceValues(forKeys: [.quarantinePropertiesKey])
-            guard recorded[.quarantinePropertiesKey] is [String: Any] else {
+            let quarantine = recorded[.quarantinePropertiesKey] as? [String: Any]
+            guard quarantine?[kLSQuarantineTypeKey as String] as? String == kLSQuarantineTypeWebDownload as String,
+                  getxattr(file.path, "com.apple.quarantine", nil, 0, 0, 0) > 0 else {
                 throw UpdateFailure.invalid("macOS could not preserve download security information.")
             }
             return file

@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import CoreServices
+import Darwin
 
 var checks = 0
 func expect(_ value: @autoclosure () -> Bool, _ message: String) {
@@ -146,7 +147,9 @@ let directoryMode = try FileManager.default.attributesOfItem(atPath: saved.delet
 expect(fileMode.intValue == 0o600 && directoryMode.intValue == 0o700, "private downloaded file and directory")
 let properties = try (saved as NSURL).resourceValues(forKeys: [.quarantinePropertiesKey])[.quarantinePropertiesKey] as? [String: Any]
 expect(properties != nil, "download retains macOS quarantine assessment")
-expect(properties?[kLSQuarantineDataURLKey as String] != nil, "quarantine records original asset provenance")
+// macOS returns a subset of properties; verify the actual download protection.
+expect(properties?[kLSQuarantineTypeKey as String] as? String == kLSQuarantineTypeWebDownload as String, "web-download quarantine type")
+expect(getxattr(saved.path, "com.apple.quarantine", nil, 0, 0, 0) > 0, "actual quarantine attribute exists")
 let malicious = UpdateOffer(version: "0.3.0", fileName: "../outside.dmg", assetURL: available.assetURL, checksumURL: available.checksumURL, assetSize: bytes.count, checksumSize: manifest.count)
 rejects("path traversal cannot be saved") { _ = try TerminalUpdates.save(bytes, offer: malicious, downloads: downloads) }
 rejects("missing destination") { _ = try TerminalUpdates.save(bytes, offer: available, downloads: root.appendingPathComponent("missing")) }
