@@ -13,14 +13,17 @@ if ! /bin/mkdir -m 700 "$lock" 2>/dev/null; then
   print -u2 'Another integration operation is in progress. If none is running, remove the stale .integration-lock directory and retry.'
   exit 1
 fi
-tmp='' temp_config='' remove_empty_base=0
+tmp='' temp_config='' remove_empty_base=0 lock_owned=1
 cleanup() {
+  (( lock_owned )) || return 0
+  lock_owned=0
   [[ -z "$tmp" ]] || /bin/rm -f -- "$tmp" 2>/dev/null || true
   [[ -z "$temp_config" ]] || /bin/rm -f -- "$temp_config" 2>/dev/null || true
   /bin/rmdir -- "$lock" 2>/dev/null || true
   (( ! remove_empty_base )) || /bin/rmdir -- "$base" 2>/dev/null || true
 }
-trap cleanup EXIT
+# zsh may skip EXIT after errexit inside a function; ZERR also releases the owned lock.
+trap cleanup EXIT ZERR
 trap 'exit 1' HUP INT TERM
 [[ ! -L "$config" && ( ! -e "$config" || ( -f "$config" && -O "$config" ) ) ]] || exit 1
 for owned in "$base/integration.zsh" "$base/state"; do
