@@ -34,13 +34,13 @@ Accepting a result edits the buffer and never executes it. Unsupported expressio
 
 **On:** assistance is available in integrated interactive shells.
 
-**Off:** Terminal Helper generates no suggestions, scans no directories, starts no helper processes and performs no polling or network requests. Its Tab binding is intentionally inert. The idle menu-bar controller stays resident and uses memory.
+**Off:** While idle, Terminal Helper generates no suggestions, scans no directories, starts no helper processes and performs no polling or network requests. Its Tab binding is intentionally inert. Explicit installation/removal may run a short-lived owned worker. The idle menu-bar controller stays resident and uses memory.
 
 **Disable and Quit:** save Off, terminate any owned installer workers, and exit. Existing shells recheck state on the next completion/acceptance interaction. A pending menu may remain visible until then. Missing or malformed state disables assistance; an unexpected controller crash may leave the last enabled state.
 
 ## Remove it
 
-In Settings choose **Uninstall shell integration**, using the same configuration folder selected during installation. Restart open shells, then move the app to Trash. The narrow managed block and owned integration/state files are removed; unrelated configuration and timestamped backups are preserved.
+In Settings choose **Uninstall shell integration**, using the same configuration folder selected during installation. Restart open shells, then move the app to Trash. The narrow managed block and owned integration/state files are removed; unrelated configuration and uniquely named backups are preserved.
 
 Install/repair and uninstall are repeatable, make backups before configuration edits, and refuse unsafe or changed targets. They serialize concurrent operations. A busy/stale lock is refused rather than stolen; see [recovery](Docs/TROUBLESHOOTING.md).
 

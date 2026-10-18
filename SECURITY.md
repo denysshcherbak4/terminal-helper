@@ -14,7 +14,7 @@ Security properties:
 - Completion must not evaluate or execute typed input. Accepting a suggestion edits text only; execution is a separate action.
 - Off gates generation and acceptance in already-open integrated shells. Missing, malformed, unsafe or unreadable state fails closed.
 - Private state is non-executable data, updated atomically. No polling, daemon or network dependency.
-- Install/uninstall must preserve unrelated shell configuration, use backups and atomic replacement, reject unsafe targets and concurrent mutation, and remove only owned content.
+- Install/uninstall must preserve unrelated shell configuration, use backups and atomic replacement, reject unsafe targets, serialize install/uninstall and refuse detected configuration changes, and remove only owned content.
 - Bundled installer processes run without elevated privileges in an owned process group. Quit disables assistance before terminating that group.
 - Filenames and descriptions are untrusted. User-configured completion definitions themselves are executable code within the existing zsh trust boundary.
 
