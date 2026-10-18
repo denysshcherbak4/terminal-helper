@@ -17,12 +17,24 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var window: NSWindow?
     private var settingsToggle: NSButton?
     private var settingsStatus: NSTextField?
+    private var settingsIntegration: NSTextField?
+    private var settingsOperation: NSTextField?
+    private var installButton: NSButton?
+    private var uninstallButton: NSButton?
+    private var setupMenuItem: NSMenuItem?
+    private var helpWindow: NSWindow?
+    private var operationStatus = ""
     private var worker: IntegrationWorker?
     private var lifecycleChild: pid_t?
-    private var configurationDirectory = FileManager.default.homeDirectoryForCurrentUser
+    private var configurationDirectory = UserDefaults.standard.string(forKey: "ShellConfigurationDirectory").map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if let index = CommandLine.arguments.firstIndex(of: "--appearance"), index + 1 < CommandLine.arguments.count {
+            let value = CommandLine.arguments[index + 1]
+            guard value == "light" || value == "dark" else { fputs("Appearance must be light or dark.\n", stderr); exit(1) }
+            NSApp.appearance = NSAppearance(named: value == "dark" ? .darkAqua : .aqua)
+        }
         if NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.denysshcherbak4.terminal-helper").count > 1 {
             NSApp.terminate(nil); return
         }
@@ -30,18 +42,31 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.button?.image = terminalGlyph(size: 22)
         item.button?.setAccessibilityLabel("Terminal Helper")
         item.button?.toolTip = "Terminal Helper — suggestions On or Off"
-        menu.delegate = self
-        menu.addItem(NSMenuItem(title: "Terminal Helper", action: nil, keyEquivalent: ""))
+        menu.delegate = self; menu.autoenablesItems = false
+        let heading = NSMenuItem(title: "Terminal Helper", action: nil, keyEquivalent: "")
+        heading.isEnabled = false; status.isEnabled = false; integration.isEnabled = false
+        menu.addItem(heading)
         menu.addItem(status)
         toggle.target = self; menu.addItem(toggle)
         menu.addItem(integration)
+        let setup = NSMenuItem(title: "Install shell integration…", action: #selector(installIntegration), keyEquivalent: "")
+        setup.target = self; setupMenuItem = setup; menu.addItem(setup)
         menu.addItem(.separator())
         add("Settings…", action: #selector(showSettings), key: ",")
         add("Help", action: #selector(showHelp))
         menu.addItem(.separator())
         add("Disable and Quit", action: #selector(disableAndQuit), key: "q")
         item.menu = menu
+        let mainMenu = NSMenu()
+        let appEntry = NSMenuItem(); mainMenu.addItem(appEntry)
+        let applicationMenu = NSMenu(title: "Terminal Helper"); appEntry.submenu = applicationMenu
+        for (title, action, key) in [("Settings…", #selector(showSettings), ","), ("Help", #selector(showHelp), ""), ("Disable and Quit", #selector(disableAndQuit), "q")] {
+            let entry = NSMenuItem(title: title, action: action, keyEquivalent: key)
+            entry.target = self; applicationMenu.addItem(entry)
+        }
+        NSApp.mainMenu = mainMenu
         refresh()
+        if !integrationInstalled && CommandLine.arguments.count == 1 { showSettings() }
         if lifecycleRoot != nil {
             DispatchQueue.main.async { self.lifecycleTest() }
         }
@@ -112,12 +137,26 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let enabled = state.enabled()
         status.title = "Suggestions: \(enabled ? "On" : "Off")"
         toggle.state = enabled ? .on : .off
+        toggle.isEnabled = enabled || (worker == nil && (integrationInstalled || lifecycleRoot != nil))
+        setupMenuItem?.isEnabled = worker == nil
+        setupMenuItem?.title = integrationInstalled ? "Repair shell integration…" : "Install shell integration…"
         integration.title = integrationInstalled ? "Integration file present; restart shells" : "Shell integration: not installed"
         item.button?.setAccessibilityValue(enabled ? "On" : "Off")
         settingsToggle?.state = toggle.state
-        settingsStatus?.stringValue = status.title + "\n" + integration.title
+        settingsToggle?.isEnabled = toggle.isEnabled
+        settingsStatus?.stringValue = status.title
+        settingsIntegration?.stringValue = integration.title
+        settingsOperation?.stringValue = operationStatus
+        settingsOperation?.isHidden = operationStatus.isEmpty
+        installButton?.title = integrationInstalled ? "Repair shell integration…" : "Install shell integration…"
+        installButton?.isEnabled = worker == nil
+        uninstallButton?.isEnabled = integrationInstalled && worker == nil
     }
     @objc private func changeEnabled() {
+        if !state.enabled(), lifecycleRoot == nil, !integrationInstalled || worker != nil {
+            operationStatus = worker == nil ? "Install shell integration before enabling suggestions." : "Wait for shell integration to finish."
+            showSettings(); return
+        }
         do { try state.write(enabled: !state.enabled()); refresh() }
         catch { report("Could not change suggestions", detail: String(describing: error)) }
     }
@@ -180,26 +219,40 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc private func showSettings() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 370), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 470), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             w.title = "Terminal Helper Settings"; w.isReleasedWhenClosed = false
+            w.contentMinSize = NSSize(width: 460, height: 450)
             let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 14
             stack.translatesAutoresizingMaskIntoConstraints = false
             w.contentView!.addSubview(stack)
-            NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: w.contentView!.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(equalTo: w.contentView!.trailingAnchor, constant: -24), stack.topAnchor.constraint(equalTo: w.contentView!.topAnchor, constant: 24)])
+            NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: w.contentView!.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(equalTo: w.contentView!.trailingAnchor, constant: -24), stack.topAnchor.constraint(equalTo: w.contentView!.topAnchor, constant: 24), stack.bottomAnchor.constraint(lessThanOrEqualTo: w.contentView!.bottomAnchor, constant: -24)])
             let title = NSTextField(labelWithString: "Helpful terminal suggestions")
             title.font = .systemFont(ofSize: 17, weight: .semibold); stack.addArrangedSubview(title)
-            let label = NSTextField(wrappingLabelWithString: "Suggestions: Off\nShell integration: not installed")
-            label.font = .systemFont(ofSize: 13); stack.addArrangedSubview(label); label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true; settingsStatus = label
+            let statusLabel = NSTextField(labelWithString: "Suggestions: Off")
+            stack.addArrangedSubview(statusLabel); settingsStatus = statusLabel
+            func paragraph(_ text: String) -> NSTextField {
+                let label = NSTextField(wrappingLabelWithString: text)
+                label.font = .systemFont(ofSize: NSFont.systemFontSize)
+                stack.addArrangedSubview(label); label.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+                return label
+            }
+            settingsIntegration = paragraph("Shell integration: not installed")
+            _ = paragraph("1. Install shell integration.\n2. Open a new terminal window.\n3. Enable suggestions, then press Tab in zsh.")
+            let install = NSButton(title: "Install shell integration…", target: self, action: #selector(installIntegration))
+            install.setAccessibilityLabel("Install or repair shell integration")
+            stack.addArrangedSubview(install); installButton = install
             let button = NSButton(checkboxWithTitle: "Enable suggestions", target: self, action: #selector(changeEnabled))
-            button.setAccessibilityLabel("Enable suggestions"); stack.addArrangedSubview(button); settingsToggle = button
-            let info = NSTextField(wrappingLabelWithString: "Use Tab in an integrated interactive zsh. Off takes effect at the next completion or acceptance. The menu-bar app stays resident while Off.")
-            info.font = .systemFont(ofSize: 13); stack.addArrangedSubview(info)
-            info.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-            let install = NSButton(title: "Install or repair shell integration…", target: self, action: #selector(installIntegration))
-            stack.addArrangedSubview(install)
+            button.setAccessibilityLabel("Enable suggestions")
+            button.setAccessibilityHelp("Install shell integration first. Off is checked at the next completion or acceptance.")
+            stack.addArrangedSubview(button); settingsToggle = button
+            _ = paragraph("Off takes effect at the next completion or acceptance. The menu-bar app stays open while suggestions are disabled.")
+            settingsOperation = paragraph("")
+            settingsOperation?.setAccessibilityLabel("Integration result")
+            let actions = NSStackView(); actions.orientation = .horizontal; actions.spacing = 12
+            let help = NSButton(title: "Help", target: self, action: #selector(showHelp)); actions.addArrangedSubview(help)
             let uninstall = NSButton(title: "Uninstall shell integration…", target: self, action: #selector(uninstallIntegration))
-            stack.addArrangedSubview(uninstall)
-            let help = NSButton(title: "Help", target: self, action: #selector(showHelp)); stack.addArrangedSubview(help)
+            actions.addArrangedSubview(uninstall); uninstallButton = uninstall
+            stack.addArrangedSubview(actions)
             window = w; w.center()
         }
         refresh(); window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
@@ -209,7 +262,27 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: "OK"); NSApp.activate(ignoringOtherApps: true); alert.runModal()
     }
     @objc private func showHelp() {
-        report("Terminal Helper", detail: "1. Install shell integration in Settings. Choose the folder containing your .zshrc (your ZDOTDIR, or home folder), then open a new zsh session.\n2. Enable suggestions from the menu bar.\n3. Tab opens completion; arrows select, Enter accepts text, and Escape cancels. Execute separately with Enter after the menu closes.\n\nOff and Disable and Quit are checked at the next completion or acceptance. Existing shell completion definitions run with your user privileges.\n\nUninstall integration from Settings using the same configuration folder before deleting the app. Documentation is included in the app's Resources/Docs folder. No history, command buffers, or filenames are logged.")
+        if helpWindow == nil {
+            guard let url = Bundle.main.url(forResource: "Help", withExtension: "txt", subdirectory: "Docs"),
+                  let help = try? String(contentsOf: url, encoding: .utf8) else {
+                report("Help unavailable", detail: "Reinstall a complete app build to restore offline documentation."); return
+            }
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 580, height: 520), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            w.title = "Terminal Helper Help"; w.isReleasedWhenClosed = false; w.contentMinSize = NSSize(width: 420, height: 320)
+            let scroll = NSScrollView(frame: w.contentView!.bounds)
+            scroll.autoresizingMask = [.width, .height]; scroll.hasVerticalScroller = true
+            let text = NSTextView(frame: scroll.contentView.bounds)
+            text.isEditable = false; text.isRichText = false; text.isSelectable = true
+            text.font = .systemFont(ofSize: NSFont.systemFontSize)
+            text.textColor = .textColor; text.backgroundColor = .textBackgroundColor
+            text.textContainerInset = NSSize(width: 20, height: 20)
+            text.isVerticallyResizable = true; text.isHorizontallyResizable = false
+            text.autoresizingMask = [.width]; text.textContainer?.widthTracksTextView = true
+            text.string = help; text.setAccessibilityLabel("Terminal Helper offline help")
+            scroll.documentView = text; w.contentView!.addSubview(scroll)
+            helpWindow = w; w.center()
+        }
+        helpWindow?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
     @objc private func installIntegration() { runIntegration("install") }
     @objc private func uninstallIntegration() {
@@ -225,23 +298,40 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let script = Bundle.main.url(forResource: operation, withExtension: "zsh", subdirectory: "Integration") else {
             report("Integration unavailable", detail: "Reinstall this app from a complete build."); return
         }
-        let chooser = NSOpenPanel()
-        chooser.title = "Choose your shell configuration folder"
-        chooser.message = "Select the folder containing your .zshrc: your ZDOTDIR if configured, otherwise your home folder. Hidden files do not need to be selected."
-        chooser.prompt = operation == "install" ? "Install here" : "Uninstall here"
-        chooser.canChooseDirectories = true; chooser.canChooseFiles = false; chooser.allowsMultipleSelection = false
-        chooser.directoryURL = configurationDirectory
-        guard chooser.runModal() == .OK, let selected = chooser.url else { return }
-        configurationDirectory = selected
+        let choice = NSAlert()
+        choice.messageText = "Choose your shell configuration"
+        choice.informativeText = "Use your home folder for a standard zsh setup. If you configured ZDOTDIR, choose that folder instead. Current folder: " + configurationDirectory.path
+        choice.addButton(withTitle: configurationDirectory == FileManager.default.homeDirectoryForCurrentUser ? "Use Home folder" : "Use selected folder")
+        choice.addButton(withTitle: "Choose another folder…"); choice.addButton(withTitle: "Cancel")
+        switch choice.runModal() {
+        case .alertFirstButtonReturn: break
+        case .alertSecondButtonReturn:
+            let chooser = NSOpenPanel()
+            chooser.title = "Choose your ZDOTDIR folder"
+            chooser.message = "Select the folder containing your .zshrc. You do not need to select the hidden file."
+            chooser.prompt = "Use this folder"
+            chooser.canChooseDirectories = true; chooser.canChooseFiles = false; chooser.allowsMultipleSelection = false
+            chooser.directoryURL = configurationDirectory
+            guard chooser.runModal() == .OK, let selected = chooser.url else { return }
+            configurationDirectory = selected
+        default: return
+        }
         let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": configurationDirectory.path]
         do {
+            operationStatus = operation == "install" ? "Installing shell integration…" : "Uninstalling shell integration…"
             worker = try IntegrationWorker(arguments: ["-f", script.path], environment: environment) { status in
                 self.worker = nil
                 if self.quitting { self.finishQuit(); return }
+                self.operationStatus = status == 0 ? (operation == "install" ? "Installed. Open a new terminal window, then enable suggestions." : "Uninstalled. Restart open terminal shells.") : "Integration update failed. Check ownership and permissions; see Help."
+                if status == 0 { UserDefaults.standard.set(self.configurationDirectory.path, forKey: "ShellConfigurationDirectory") }
                 self.refresh()
                 self.report(status == 0 ? "Shell integration updated" : "Shell integration could not be updated", detail: status == 0 ? "Open a new terminal shell to use the updated configuration." : "Check that your shell configuration and Terminal Helper folder belong to you and are writable. See the troubleshooting guide; no configuration is overwritten.")
             }
-        } catch { worker = nil; report("Could not run installer", detail: "The bundled installer could not start.") }
+            refresh()
+        } catch {
+            worker = nil; operationStatus = "The bundled installer could not start. Reinstall a complete app build."
+            refresh(); report("Could not run installer", detail: operationStatus)
+        }
     }
 }
 
