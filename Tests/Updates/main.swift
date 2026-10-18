@@ -135,8 +135,10 @@ let sentinel = downloads.appendingPathComponent("unrelated.txt"); try Data("keep
 let saved = try TerminalUpdates.save(bytes, offer: available, downloads: downloads)
 let second = try TerminalUpdates.save(bytes, offer: available, downloads: downloads)
 expect(saved != second && saved.lastPathComponent == name, "unique destination; no overwrite")
-expect(try Data(contentsOf: saved) == bytes, "verified bytes saved")
-expect(try Data(contentsOf: sentinel) == Data("keep".utf8), "unrelated files preserved")
+let savedBytes = try Data(contentsOf: saved)
+expect(savedBytes == bytes, "verified bytes saved")
+let untouched = try Data(contentsOf: sentinel)
+expect(untouched == Data("keep".utf8), "unrelated files preserved")
 let fileMode = try FileManager.default.attributesOfItem(atPath: saved.path)[.posixPermissions] as! NSNumber
 let directoryMode = try FileManager.default.attributesOfItem(atPath: saved.deletingLastPathComponent().path)[.posixPermissions] as! NSNumber
 expect(fileMode.intValue == 0o600 && directoryMode.intValue == 0o700, "private downloaded file and directory")
