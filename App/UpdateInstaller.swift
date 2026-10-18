@@ -28,7 +28,7 @@ final class UpdateCancellation {
         for number in [SIGTERM, SIGINT] { signal(number, SIG_DFL) }
     }
     func check() throws {
-        if cancelled { throw UpdateFailure.invalid("Update cancelled. Suggestions remain Off; any completed installation can be recovered from its retained backup.") }
+        if cancelled { throw UpdateFailure.invalid("Update cancelled before replacement. Reopen Terminal Helper if needed; recovery copies are retained if installation started.") }
     }
 }
 

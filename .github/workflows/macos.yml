@@ -96,6 +96,9 @@ jobs:
       - name: External quit lifecycle test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --termination-self-test | tee results/termination-tests.txt'
+      - name: Explicit Quit cancels update and integration workers
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --update-cancel-self-test | tee results/update-cancel-tests.txt'
       - name: Completion timing
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json

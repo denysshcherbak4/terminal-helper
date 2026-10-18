@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 
 let fm = FileManager.default
-let root = fm.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("TH-updater-tests-" + UUID().uuidString)
+let root = fm.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("TH updater дані tests " + UUID().uuidString)
 try fm.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
 defer { try? fm.removeItem(at: root) }
 var checks = 0
@@ -187,6 +187,16 @@ do {
         else if url == offer.checksumURL { done(.success(sums)) }
         else { done(.failure(UpdateFailure.invalid("Unexpected fixture network request"))) }
     }
+    try rejects("cancel during release verification") {
+        let delayed: TerminalUpdates.Fetch = { _, _, done in
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { kill(getpid(), SIGTERM) }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { done(.success(catalog)) }
+        }
+        _ = try UpdateInstaller.install(disk: saved, version: "0.4.0", target: target, fetch: delayed, launch: { _ in false })
+    }
+    try expect(UpdateInstaller.cancelledByUser, "SIGTERM cooperatively cancels preparation")
+    try expect(UpdateInstaller.bundleVersion(target) == "0.3.0", "cancellation preserves installed app")
+    try expect(!fm.fileExists(atPath: support.appendingPathComponent(".integration-lock").path), "cancellation leaves no integration lock")
     var opened: URL?
     let installed = try UpdateInstaller.install(disk: saved, version: "0.4.0", target: target,
         fetch: fetch, launch: { opened = $0; return false })
