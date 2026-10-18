@@ -18,6 +18,16 @@
 
 Developer ID signing, notarization and a public release are the remaining distribution gates. The prepared preview is for technical review; [verification](Docs/VERIFICATION.md) records what is tested. The installed app needs no account and makes no network requests.
 
+<details>
+<summary>See the actual macOS Settings window</summary>
+
+Light and dark native renders from the remote macOS build:
+
+![Terminal Helper Settings in light appearance](.github/images/settings-light.png)
+![Terminal Helper Settings in dark appearance](.github/images/settings-dark.png)
+
+</details>
+
 ## What it does
 
 Terminal Helper is a native macOS menu-bar app for the interactive zsh you already use. Terminal.app is the primary target; real terminal-app and assistive-technology checks are listed in the [manual checklist](Docs/MANUAL-VERIFICATION.md).
