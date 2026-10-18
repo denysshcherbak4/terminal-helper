@@ -122,7 +122,7 @@ final class BoundedRequest: NSObject, URLSessionDataDelegate {
 
 enum TerminalUpdates {
     typealias Fetch = (URL, Int, @escaping (Result<Data, Error>) -> Void) -> Void
-    static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+    static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0"
     static let releasesURL = URL(string: "https://github.com/denysshcherbak4/terminal-helper/releases")!
     static let catalogURL = URL(string: "https://api.github.com/repos/denysshcherbak4/terminal-helper/releases/latest")!
     static let maximumDownload = 64 * 1024 * 1024
@@ -285,6 +285,19 @@ enum TerminalUpdates {
 
 func updateCommandLine() -> Int32? {
     let arguments = CommandLine.arguments
+    if arguments.count == 4, arguments[1] == "--apply-update" {
+        do {
+            _ = try UpdateInstaller.install(disk: URL(fileURLWithPath: arguments[2]), version: arguments[3])
+            return 0
+        } catch {
+            fputs("\(error.localizedDescription)\n", stderr)
+            let alert = NSAlert(); alert.messageText = "Update could not be completed"
+            alert.informativeText = error.localizedDescription + " See the update recovery guide if a backup was retained."
+            alert.addButton(withTitle: "OK"); NSApplication.shared.setActivationPolicy(.accessory)
+            NSApp.activate(ignoringOtherApps: true); alert.runModal()
+            return 1
+        }
+    }
     guard arguments.count == 2, ["--version", "--check-for-updates", "--update"].contains(arguments[1]) else { return nil }
     if arguments[1] == "--version" { print("Terminal Helper \(TerminalUpdates.currentVersion)"); return 0 }
     func wait<T>(_ start: (@escaping (Result<T, Error>) -> Void) -> Void) -> Result<T, Error> {
@@ -305,18 +318,21 @@ func updateCommandLine() -> Int32? {
     case .success(.upToDate): print("Terminal Helper \(TerminalUpdates.currentVersion) is up to date."); return 0
     case .success(.available(let offer)):
         print("Version \(offer.version) is available (installed: \(TerminalUpdates.currentVersion)).")
-        if arguments[1] == "--check-for-updates" { print("Run terminal-helper update to download it."); return 0 }
-        print("Downloading and verifying the update. This does not replace or run the app.")
+        if arguments[1] == "--check-for-updates" { print("Run terminal-helper update to install it."); return 0 }
+        print("Downloading and verifying the update. Installation will close Terminal Helper and leave suggestions Off.")
         let downloaded: Result<URL, Error> = wait { TerminalUpdates.download(offer, completion: $0) }
         switch downloaded {
         case .failure(let error): fputs("\(error.localizedDescription)\n", stderr); return 1
         case .success(let file):
             print("Verified SHA-256. Saved to \(file.path)")
-            print("Disable and Quit Terminal Helper, drag the app from the DMG to the same Applications folder, reopen it, and update shell integration if prompted.")
-            print("This free build is ad-hoc signed, not notarized. If you trust this source, macOS may require Privacy & Security → Open Anyway for this app. Never override a malware or damaged-app warning.")
-            guard NSWorkspace.shared.open(file) else {
-                fputs("Could not open the disk image. Open the saved DMG in Finder.\n", stderr); return 1
-            }
+            do {
+                let installed = try UpdateInstaller.install(disk: file, version: offer.version)
+                print("Installed Terminal Helper \(offer.version). Previous app: \(installed.backup.path)")
+                print("Restart terminal windows, then enable suggestions. Shell configuration and settings were preserved.")
+                if !installed.relaunched {
+                    print("Open Terminal Helper from Applications. macOS may require Privacy & Security → Open Anyway if you trust this exact release. Never override a malware or damaged-app warning.")
+                }
+            } catch { fputs("\(error.localizedDescription)\n", stderr); return 1 }
             return 0
         }
     }

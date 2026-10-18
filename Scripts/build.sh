@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version="${VERSION:-0.2.0}"
+version="${VERSION:-0.3.0}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'VERSION must be numeric major.minor.patch' >&2; exit 1; }
 [[ "$(uname -s)" == Darwin ]] || { echo 'Build requires macOS with Xcode command-line tools.' >&2; exit 1; }
 mkdir -p build dist
@@ -9,7 +9,7 @@ app='dist/Terminal Helper.app'
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/Integration" "$app/Contents/Resources/Docs"
 sdk="$(xcrun --sdk macosx --show-sdk-path)"
 for arch in arm64 x86_64; do
-    xcrun swiftc -O -sdk "$sdk" -target "$arch-apple-macosx13.0" App/State.swift App/Icon.swift App/IntegrationWorker.swift App/Updates.swift App/main.swift -o "build/TerminalHelper-$arch" -framework AppKit
+    xcrun swiftc -O -sdk "$sdk" -target "$arch-apple-macosx13.0" App/State.swift App/Icon.swift App/IntegrationWorker.swift App/Updates.swift App/UpdateInstaller.swift App/main.swift -o "build/TerminalHelper-$arch" -framework AppKit
 done
 xcrun lipo -create build/TerminalHelper-arm64 build/TerminalHelper-x86_64 -output "$app/Contents/MacOS/TerminalHelper"
 xcrun swiftc -O App/Icon.swift Scripts/GenerateIcon.swift -o build/generate-icon -framework AppKit
