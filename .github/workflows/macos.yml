@@ -81,7 +81,7 @@ jobs:
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: |
           swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateController/main.swift -o build-controller-tests -framework AppKit -framework CoreServices
-          ./build-controller-tests "$PWD/dist/Terminal Helper.app" | tee results/update-controller-tests.txt
+          python3 -c 'import os, subprocess; subprocess.run(["./build-controller-tests", os.path.abspath("dist/Terminal Helper.app")], check=True, timeout=45)' | tee results/update-controller-tests.txt
       - name: App version command
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: |
@@ -91,19 +91,24 @@ jobs:
           printf '%s\n' "$actual" | tee results/version-tests.txt
       - name: App state tests
         if: always() && !cancelled() && steps.build.outcome == 'success'
-        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test | tee results/app-tests.txt'
+        run: |
+          python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--self-test"], check=True, timeout=45)' | tee results/app-tests.txt
       - name: Native Settings tests
         if: always() && !cancelled() && steps.build.outcome == 'success'
-        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --settings-self-test | tee results/settings-tests.txt'
+        run: |
+          python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--settings-self-test"], check=True, timeout=45)' | tee results/settings-tests.txt
       - name: Controller lifecycle test
         if: always() && !cancelled() && steps.build.outcome == 'success'
-        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test | tee results/lifecycle-tests.txt'
+        run: |
+          python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--lifecycle-test"], check=True, timeout=45)' | tee results/lifecycle-tests.txt
       - name: External quit lifecycle test
         if: always() && !cancelled() && steps.build.outcome == 'success'
-        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --termination-self-test | tee results/termination-tests.txt'
+        run: |
+          python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--termination-self-test"], check=True, timeout=45)' | tee results/termination-tests.txt
       - name: Explicit Quit cancels update and integration workers
         if: always() && !cancelled() && steps.build.outcome == 'success'
-        run: '"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --update-cancel-self-test | tee results/update-cancel-tests.txt'
+        run: |
+          python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--update-cancel-self-test"], check=True, timeout=45)' | tee results/update-cancel-tests.txt
       - name: Completion timing
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py --benchmark | tee results/completion-timing.json
