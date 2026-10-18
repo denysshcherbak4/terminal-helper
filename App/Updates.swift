@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import CoreServices
 
 enum UpdateFailure: Error, LocalizedError {
     case http(Int)
@@ -236,6 +237,19 @@ enum TerminalUpdates {
             let file = folder.appendingPathComponent(offer.fileName)
             try data.write(to: file, options: .withoutOverwriting)
             try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+            // Programmatic downloads must retain macOS first-open security assessment.
+            let properties: [String: Any] = [
+                kLSQuarantineTypeKey as String: kLSQuarantineTypeWebDownload as String,
+                kLSQuarantineAgentNameKey as String: "Terminal Helper",
+                kLSQuarantineAgentBundleIdentifierKey as String: "io.github.denysshcherbak4.terminal-helper",
+                kLSQuarantineDataURLKey as String: offer.assetURL,
+                kLSQuarantineOriginURLKey as String: releasesURL
+            ]
+            try (file as NSURL).setResourceValue(properties, forKey: .quarantinePropertiesKey)
+            let recorded = try (file as NSURL).resourceValues(forKeys: [.quarantinePropertiesKey])
+            guard recorded[.quarantinePropertiesKey] is [String: Any] else {
+                throw UpdateFailure.invalid("macOS could not preserve download security information.")
+            }
             return file
         } catch {
             try? manager.removeItem(at: folder)
