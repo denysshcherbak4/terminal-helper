@@ -47,7 +47,7 @@ open terminal shells. Update checks are manual; no background polling occurs.
 
 This disk image does not install or execute anything automatically.
 HELP
-name="Terminal-Helper-${version}-${source_sha:0:12}-universal.dmg"
+name="Terminal-Helper-${version}-universal.dmg"
 hdiutil create -volname 'Terminal Helper' -srcfolder "$stage" -format UDZO -ov "dist/$name"
 hdiutil verify "dist/$name"
 hdiutil attach "dist/$name" -readonly -nobrowse -mountpoint "$mount" -quiet
