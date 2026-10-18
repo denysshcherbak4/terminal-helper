@@ -12,7 +12,7 @@
 
 1. Open the test-build link, select a **green run on main**, and download its `Terminal-Helper-macos-15-…` artifact under **Artifacts**. GitHub currently requires sign-in for these CI downloads.
 2. Unzip the download. In `dist`, find the versioned **universal .dmg** and `SHA256SUMS.txt`. Both architectures use the same installation steps.
-3. Open the DMG and drag **Terminal Helper** to **Applications**. No privileged installer or shell command is required to copy the app.
+3. Open the DMG and drag **Terminal Helper** to **Applications**. If your account cannot write there, copy it to **Applications inside your home folder** instead. The app and shell integration need no administrator privileges.
 4. With a trusted build, open Terminal Helper from Applications. Click its **>_ menu-bar icon → Settings → Install shell integration**. Use your home folder, or choose your custom `ZDOTDIR`.
 5. Open a **new terminal window**, then switch **Enable suggestions** On. Tab requests completion; arrows select; Enter accepts text; Escape cancels. Press Enter separately to execute.
 

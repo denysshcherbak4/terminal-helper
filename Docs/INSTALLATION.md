@@ -20,7 +20,7 @@ This checks file integrity, not a trusted developer identity.
 
 ## Copy and set up the app
 
-1. Open the DMG and drag Terminal Helper to Applications. Eject the image. The app does not install a daemon or require an administrator password.
+1. Open the DMG and drag Terminal Helper to Applications. If Finder requests administrator credentials for the system Applications folder, use Applications inside your home folder (~/Applications) instead; create that folder in Finder if needed. Eject the image. The app and its integration need no administrator privileges and install no daemon.
 2. Open a trusted build from Applications. Use the >_ icon at the top of the screen and open Settings.
 3. Choose Install shell integration. For a normal setup use your home folder; for a custom ZDOTDIR select the folder containing that .zshrc. The installer backs up the existing file and adds only its marked block.
 4. Open a new terminal window, then turn Enable suggestions On.
