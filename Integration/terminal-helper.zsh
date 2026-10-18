@@ -1,11 +1,10 @@
 # Sourced by the explicitly installed interactive zsh integration.
 [[ -o interactive ]] || return 0
 (( ${+_TH_LOADED} )) && return 0
-typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0
-zmodload zsh/stat || return 0
-zmodload zsh/mapfile || return 0
+typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW='' _TH_MENU_ACTIVE=0
 
 _th_enabled() {
+  zmodload zsh/stat zsh/mapfile || return 1
   local base="$HOME/Library/Application Support/Terminal Helper" value
   local -A info
   [[ -d "$base" && ! -L "$base" && -O "$base" ]] || return 1
@@ -67,6 +66,13 @@ _th_correct() {
 _th_tab() {
   _th_enabled || { zle -M 'Terminal Helper: Off'; return 0; }
   _th_supported || { zle -M 'Terminal Helper: unsupported syntax; input unchanged'; return 0; }
+  if (( ! _TH_READY )); then
+    zmodload zsh/complist || return 0
+    autoload -Uz add-zle-hook-widget
+    add-zle-hook-widget line-pre-redraw _th_redraw
+    add-zle-hook-widget line-finish _th_line_finish
+    _TH_READY=1
+  fi
   if (( ! ${+functions[compdef]} )); then
     autoload -Uz compinit
     # Retain zsh completion ownership/permission checks and avoid dump/cache creation.
@@ -78,7 +84,27 @@ _th_tab() {
     _TH_CURSOR=$CURSOR
     _TH_ACTIVE=1
   fi
-  zle _th_completion
+  _TH_PREVIEW_SET=0
+  # Native selection continues after the completion call; retain this map until it ends.
+  if (( ! _TH_MENU_ACTIVE )); then
+    bindkey -N _th_helper_menu menuselect
+    bindkey -A menuselect _th_user_menu
+    bindkey -M _th_helper_menu '^M' _th_menu_accept
+    bindkey -M _th_helper_menu '^J' _th_menu_accept
+    bindkey -M _th_helper_menu '^I' menu-complete
+    bindkey -M _th_helper_menu '^[' _th_cancel
+    bindkey -A _th_helper_menu menuselect
+    _TH_MENU_ACTIVE=1
+  fi
+  {
+    zle _th_completion
+  } always {
+    (( ! TRY_BLOCK_ERROR && _TH_ACTIVE )) || _th_restore_menu
+  }
+  if (( _TH_ACTIVE )); then
+    _TH_PREVIEW=$BUFFER
+    _TH_PREVIEW_SET=1
+  fi
 }
 
 _th_completion() {
@@ -91,6 +117,14 @@ _th_completion() {
   fi
 }
 
+_th_restore_menu() {
+  if (( _TH_MENU_ACTIVE )); then
+    bindkey -A _th_user_menu menuselect
+    bindkey -D _th_helper_menu _th_user_menu
+    _TH_MENU_ACTIVE=0
+  fi
+}
+
 _th_accept() {
   if (( _TH_CANCELLED )); then
     _TH_CANCELLED=0
@@ -99,6 +133,7 @@ _th_accept() {
   if (( _TH_ACTIVE )); then
     _th_enabled || { BUFFER=$_TH_ORIGINAL; CURSOR=$_TH_CURSOR; }
     _TH_ACTIVE=0
+    _th_restore_menu
     zle -M ''
     return 0
   fi
@@ -110,6 +145,7 @@ _th_cancel() {
     BUFFER=$_TH_ORIGINAL
     CURSOR=$_TH_CURSOR
     _TH_ACTIVE=0
+    _th_restore_menu
     zle -M ''
   else
     if (( ${+widgets[_th_original_escape]} )); then
@@ -126,7 +162,17 @@ _th_redraw() {
     CURSOR=$_TH_CURSOR
     _TH_ACTIVE=0
     _TH_CANCELLED=1
+    _th_restore_menu
     zle -M 'Terminal Helper: Off; suggestion cancelled'
+  elif (( _TH_ACTIVE && _TH_PREVIEW_SET )) && [[ "$BUFFER" != "$_TH_PREVIEW" ]]; then
+    # Arrow selection also edits BUFFER; only actual editing widgets end the pending suggestion.
+    case "$LASTWIDGET" in
+      self-insert|quoted-insert|bracketed-paste|kill-whole-line|kill-buffer|backward-kill-line|backward-delete-char|delete-char|kill-word|backward-kill-word)
+        _TH_ACTIVE=0
+        _TH_PREVIEW_SET=0
+        _th_restore_menu
+        ;;
+    esac
   fi
 }
 
@@ -138,7 +184,7 @@ _th_newline() {
   if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle _th_original_newline; fi
 }
 
-_th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; }
+_th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; _th_restore_menu; }
 
 _th_menu_accept() {
   # A custom menu widget exits selection; never accept/execute the command here.
@@ -147,15 +193,17 @@ _th_menu_accept() {
 }
 
 # Key macros cannot be safely delegated as widgets; leave this shell unchanged.
-typeset _th_return_binding=${${(z)$(bindkey '^M')}[-1]}
-typeset _th_newline_binding=${${(z)$(bindkey '^J')}[-1]}
-typeset _th_escape_binding=${${(z)$(bindkey '^[')}[-1]}
+typeset -a _th_bindings
+_th_bindings=("${(@f)$(bindkey '^M'; bindkey '^J'; bindkey '^[')}")
+typeset _th_return_binding=${${(z)_th_bindings[1]}[-1]}
+typeset _th_newline_binding=${${(z)_th_bindings[2]}[-1]}
+typeset _th_escape_binding=${${(z)_th_bindings[3]}[-1]}
 (( ${+widgets[$_th_return_binding]} && ${+widgets[$_th_newline_binding]} && ${+widgets[$_th_escape_binding]} )) || return 0
 zle -A accept-line _th_original_accept
 zle -A "$_th_return_binding" _th_original_return
 zle -A "$_th_newline_binding" _th_original_newline
 zle -A "$_th_escape_binding" _th_original_escape
-unset _th_return_binding _th_newline_binding _th_escape_binding
+unset _th_return_binding _th_newline_binding _th_escape_binding _th_bindings
 
 zle -N _th_tab
 zle -N _th_return
@@ -170,11 +218,3 @@ bindkey '^M' _th_return
 bindkey '^J' _th_newline
 bindkey '^[' _th_cancel
 zle -N accept-line _th_accept
-zmodload zsh/complist
-bindkey -M menuselect '^M' _th_menu_accept
-bindkey -M menuselect '^J' _th_menu_accept
-bindkey -M menuselect '^I' menu-complete
-bindkey -M menuselect '^[' _th_cancel
-autoload -Uz add-zle-hook-widget
-add-zle-hook-widget line-pre-redraw _th_redraw
-add-zle-hook-widget line-finish _th_line_finish

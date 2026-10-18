@@ -2,69 +2,86 @@
 
 **Helpful terminal suggestions, with one switch to turn them off.**
 
-A small native macOS menu-bar app controlling an interactive zsh integration. Terminal.app is the primary manual-validation target. It assists the terminal you already use.
+## Install on macOS
 
-## Test build status
+**macOS 13+ · Apple Silicon and Intel · no Xcode, Python, or Node needed**
 
-This is an engineering preview, not a public release. The repository name remains `terminal-helper`. CI builds a universal Apple Silicon/Intel app targeting **macOS 13 or later**. Build results and actual measurements are recorded in [verification](Docs/VERIFICATION.md).
+**Current availability: engineering preview.** The test app is ad-hoc signed and is **not notarized**. A normal, Gatekeeper-trusted public download is not available yet. If macOS refuses the preview, stop; do not disable Gatekeeper or remove quarantine protection.
 
-No Developer ID signing/notarization credentials are configured. CI performs ad-hoc integrity signing; this does **not** make a downloaded build trusted by Gatekeeper. Do not disable Gatekeeper. A normal beginner-friendly public installation remains blocked until Developer ID signing and notarization are configured and tested.
+[**Download a test build →**](https://github.com/denysshcherbak4/terminal-helper/actions/workflows/macos.yml?query=branch%3Amain) · [Public releases](https://github.com/denysshcherbak4/terminal-helper/releases) · [Installation help](Docs/INSTALLATION.md)
 
-## Try the CI artifact
+1. Open the test-build link, select a **green run on main**, and download its `Terminal-Helper-macos-15-…` artifact under **Artifacts**. GitHub currently requires sign-in for these CI downloads.
+2. Unzip the download. In `dist`, find the versioned **universal .dmg** and `SHA256SUMS.txt`. Both architectures use the same installation steps.
+3. Open the DMG and drag **Terminal Helper** to **Applications**. If your account cannot write there, copy it to **Applications inside your home folder** instead. The app and shell integration need no administrator privileges.
+4. With a trusted build, open Terminal Helper from Applications. Click its **>_ menu-bar icon → Settings → Install shell integration**. Use your home folder, or choose your custom `ZDOTDIR`.
+5. Open a **new terminal window**, then switch **Enable suggestions** On. Tab requests completion; arrows select; Enter accepts text; Escape cancels. Press Enter separately to execute.
 
-1. Open the successful [macOS MVP Actions run](https://github.com/denysshcherbak4/terminal-helper/actions/workflows/macos.yml) for the PR's exact commit. GitHub login may be required to download artifacts.
-2. Download `Terminal-Helper-macos-15-<commit>` or its Intel-runner equivalent. Both builds contain a universal app, a versioned ZIP, `SHA256SUMS.txt`, test logs, a real Settings render, and measurement results.
-3. Verify the versioned ZIP against its checksum. Unzip to obtain `Terminal Helper.app`. Installing/running on your own Mac is a separate, explicitly authorized testing step. The unsigned-developer-identity limitation above applies.
-4. Once a trusted build is available, drag it to Applications and open it. Use the terminal prompt icon in the macOS menu bar → Settings → Install or repair shell integration. Open a new interactive zsh.
-5. Toggle **Enable suggestions**. Tab requests completion, arrows navigate, Enter accepts text, and Escape restores the original input. Execution requires a separate Enter after acceptance.
+Developer ID signing, notarization and a public release are the remaining distribution gates. The prepared preview is for technical review; [verification](Docs/VERIFICATION.md) records what is tested. The installed app needs no account and makes no network requests.
 
-No Xcode, Python, Node, account, cloud AI, screen recording, Accessibility permission, or whole-disk index is needed by the installed app. Developers need Xcode command-line tools to build; CI tests use Python.
+<details>
+<summary>See the actual macOS Settings window</summary>
+
+Light and dark native renders from the remote macOS build:
+
+![Terminal Helper Settings in light appearance](.github/images/settings-light.png)
+![Terminal Helper Settings in dark appearance](.github/images/settings-dark.png)
+
+</details>
 
 ## What it does
 
-- Real file/directory and executable completion through zsh's completion system.
-- Existing command-specific completion, including Git where configured.
-- Explicitly labelled typo correction of a missing final path component, using nearby existing entries. Missing intermediate ancestors fall back unchanged.
-- Filenames such as CSV, Parquet, and notebooks are ordinary files. There is no Python/Jupyter runtime introspection.
-- Existing zsh completion descriptions where provided by configured definitions.
-- Native On/Off status, integration status, Settings, Help, and Disable and Quit.
+Terminal Helper is a native macOS menu-bar app for the interactive zsh you already use. Terminal.app is the primary target; real terminal-app and assistive-technology checks are listed in the [manual checklist](Docs/MANUAL-VERIFICATION.md).
 
-Exact/prefix results take priority. A valid path is never replaced with a fuzzy alternative. Unsupported syntax is kept intact. Existing third-party completion definitions execute with your shell's normal user privileges; use only trusted definitions.
+- Complete actual files, directories and executable names.
+- Reuse existing command-specific completion, including Git where configured.
+- Offer labelled, one-edit corrections for a missing final path component. Exact/prefix matches come first; existing valid paths are never replaced with fuzzy alternatives.
+- Show reliable descriptions supplied by configured completion definitions.
+- Complete CSV, Parquet and notebook filenames as ordinary files. It does not inspect Python or Jupyter objects.
 
-## On, Off, and Quit
+Accepting a result edits the buffer and never executes it. Unsupported expressions and ambiguous syntax retain the input. Corrections do not search recursively and decline above 256 sibling entries; at most 20 corrections are offered. Existing native/third-party completion can still be expensive in large or remote directories.
 
-On allows assistance in integrated interactive shells. Off prevents Terminal Helper candidate generation and filesystem scans; its Tab binding is intentionally inert while Off. The idle controller remains resident and consumes memory. Original keybindings are restored in new shells after uninstall.
+## One switch
 
-The shared switch is checked at completion and acceptance boundaries, including in already-open shells. A pending menu can remain visible until interaction; instant dismissal is not promised. Disable and Quit writes Off before exiting. Missing/malformed state fails closed. An unexpected controller crash may leave the last enabled state, unlike Disable and Quit.
+**On:** assistance is available in integrated interactive shells.
 
-## Shell configuration and uninstall
+**Off:** While idle, Terminal Helper generates no suggestions, scans no directories, starts no helper processes and performs no polling or network requests. Its Tab binding is intentionally inert. Explicit installation/removal may run a short-lived owned worker. The idle menu-bar controller stays resident and uses memory.
 
-Install/repair adds one clearly marked block to `.zshrc` and copies the bundled integration to the private `~/Library/Application Support/Terminal Helper` directory. Existing configuration is backed up before edits. Repeated installation does not duplicate the block. The installer honors the ZDOTDIR visible to its process and refuses unsafe targets.
+**Disable and Quit:** save Off, terminate any owned installer workers, and exit. Existing shells recheck state on the next completion/acceptance interaction. A pending menu may remain visible until then. Missing or malformed state disables assistance; an unexpected controller crash may leave the last enabled state.
 
-Settings asks you to select the folder containing your `.zshrc` (your home folder, or your custom `ZDOTDIR`). Choose the same folder for uninstall. This avoids assuming a Finder-launched app inherits shell environment. You can also invoke the bundled installer explicitly from your configured shell:
+## Remove it
 
-```zsh
-/bin/zsh -f "/Applications/Terminal Helper.app/Contents/Resources/Integration/install.zsh"
-```
+In Settings choose **Uninstall shell integration**, using the same configuration folder selected during installation. Restart open shells, then move the app to Trash. The narrow managed block and owned integration/state files are removed; unrelated configuration and uniquely named backups are preserved.
 
-Use Settings → Uninstall shell integration, then restart open shells. It disables assistance, removes only the owned configuration block and integration, and removes its state. Missing state keeps existing shells inert. After all integrated shells close, you may delete the app and any remaining private support folder. Backups next to your shell configuration remain yours to keep or restore. A partial/edited managed block is rejected; inspect your backup rather than overwriting configuration.
+Install/repair and uninstall are repeatable, make backups before configuration edits, and refuse unsafe or changed targets. They serialize concurrent operations. A busy/stale lock is refused rather than stolen; see [recovery](Docs/TROUBLESHOOTING.md).
 
-## Limits and performance
+## Privacy and security
 
-Fuzzy correction is limited to one edit, at most 256 sibling entries and 20 candidates, without recursive searching. Native/user-defined zsh completion can still enumerate large directories or run its own logic, so filesystem latency and third-party completions can exceed targets. No hard latency cap is claimed.
+No telemetry, command/history collection, environment dumps, account, cloud AI, database, whole-disk index, global keyboard monitor, Accessibility permission, or screen recording.
 
-The engineering targets are added shell-startup p95 ≤30 ms and first useful suggestion p95 ≤100 ms on a documented fixture. See the actual runner measurements, method, fixture, and remaining checks in [verification](Docs/VERIFICATION.md). Targets are not measurements.
+The app and integration run with your ordinary user privileges. Existing third-party zsh completion is executable code and retains its own trust boundary; use trusted completion definitions. No typed command is evaluated to produce suggestions.
 
-## Build and test remotely
+Read the [privacy policy](PRIVACY.md) and [security policy](SECURITY.md). Report vulnerabilities **privately** through [GitHub security reporting](https://github.com/denysshcherbak4/terminal-helper/security/advisories/new), not public issues. GitHub secret scanning and push protection are enabled.
+
+## Verification and development
+
+[CI and measurements](Docs/VERIFICATION.md) · [Architecture](Docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](Docs/ROADMAP.md)
+
+The current engineering targets are added startup p95 ≤30 ms and first useful suggestion p95 ≤100 ms on a documented fixture. Historical runs missed startup and unconfigured-first-Tab targets; warm values must not be substituted for first-use values. Every artifact contains the exact commit, environment, raw measurements and test logs.
+
+Build only on a disposable macOS development machine or remote runner with Xcode command-line tools; Python 3 is for tests:
 
 ```sh
 bash Scripts/build.sh
 python3 Tests/Shell/test_pty.py
 python3 Tests/Shell/test_install.py
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test
+"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test
 python3 Tests/Performance/measure.py
+bash Scripts/package.sh
 ```
 
-Run on a disposable remote macOS runner with Xcode tools and Python 3. `Scripts/build.sh` compiles both architectures with the macOS 13 deployment target, bundles integration/docs, generates the app icon from native vector drawing, and ad-hoc signs/verifies the app. `VERSION=0.1.0` may be set explicitly. It does not install the app. CI packages a commit-qualified ZIP and SHA-256 checksum, with 14-day artifact retention. Dependencies: system Swift/AppKit, zsh, shell utilities; Python standard library for tests only.
+Builds target macOS 13 and contain arm64/x86_64. The native icon is generated from editable [vector sources](Assets). CI artifacts expire after 14 days; a draft release is not a public download.
 
-See [architecture](Docs/ARCHITECTURE.md), [manual release checks](Docs/MANUAL-VERIFICATION.md), and the [short roadmap](Docs/ROADMAP.md). Editable vector identity sources live in [Assets](Assets).
+## License
+
+[MIT](LICENSE). Copyright 2026 denysshcherbak4 and contributors. See the license for terms and warranty disclaimer.

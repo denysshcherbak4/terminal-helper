@@ -70,5 +70,48 @@ class InstallationTests(unittest.TestCase):
             subprocess.run(['/bin/zsh', script], env=env, check=True, capture_output=True)
             self.assertTrue(installed.is_file())
 
+    def test_busy_lifecycle_lock_never_changes_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config = home / '.zshrc'
+            config.write_bytes(b'KEEP=1')
+            base = home / 'Library/Application Support/Terminal Helper'
+            (base / '.integration-lock').mkdir(parents=True)
+            env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home)}
+            for name in ('install.zsh', 'uninstall.zsh'):
+                result = subprocess.run(['/bin/zsh', str(ROOT / 'Integration' / name)], env=env, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(config.read_bytes(), b'KEEP=1')
+            self.assertTrue((base / '.integration-lock').is_dir())
+
+    def test_modes_readonly_and_nonregular_owned_targets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            config = home / '.zshrc'
+            config.write_bytes(b'KEEP=1')
+            config.chmod(0o400)
+            base = home / 'Library/Application Support/Terminal Helper'
+            env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home)}
+            install = ['/bin/zsh', str(ROOT / 'Integration/install.zsh')]
+            result = subprocess.run(install, env=env, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(config.read_bytes(), b'KEEP=1')
+            self.assertEqual(config.stat().st_mode & 0o777, 0o400)
+            self.assertFalse((base / '.integration-lock').exists(), result.stderr.decode(errors='replace'))
+            config.chmod(0o640)
+            (base / 'integration.zsh').mkdir()
+            result = subprocess.run(install, env=env, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(config.read_bytes(), b'KEEP=1')
+            self.assertFalse((base / '.integration-lock').exists(), result.stderr.decode(errors='replace'))
+            (base / 'integration.zsh').rmdir()
+            result = subprocess.run(install, env=env, capture_output=True)
+            self.assertEqual(result.returncode, 0, (result.stdout + result.stderr).decode(errors='replace'))
+            self.assertEqual(config.stat().st_mode & 0o777, 0o640)
+            subprocess.run(['/bin/zsh', str(ROOT / 'Integration/uninstall.zsh')], env=env, check=True, capture_output=True)
+            self.assertEqual(config.read_bytes(), b'KEEP=1')
+            self.assertEqual(config.stat().st_mode & 0o777, 0o640)
+            self.assertFalse((base / '.integration-lock').exists())
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

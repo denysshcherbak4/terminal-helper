@@ -6,7 +6,50 @@ base="$HOME/Library/Application Support/Terminal Helper"
 config="${ZDOTDIR:-$HOME}/.zshrc"
 [[ ! -L "$base" && ( ! -e "$base" || ( -d "$base" && -O "$base" ) ) ]] || exit 1
 [[ -d "${config:h}" && -O "${config:h}" && ! -L "${config:h}" ]] || exit 1
+/bin/mkdir -p -m 700 "$base"
+/bin/chmod 700 "$base"
+lock="$base/.integration-lock"
+if ! /bin/mkdir -m 700 "$lock" 2>/dev/null; then
+  print -u2 'Another integration operation is in progress. If none is running, remove the stale .integration-lock directory and retry.'
+  exit 1
+fi
+tmp='' temp_config='' remove_empty_base=0 lock_owned=1
+cleanup() {
+  (( lock_owned )) || return 0
+  lock_owned=0
+  [[ -z "$tmp" ]] || /bin/rm -f -- "$tmp" 2>/dev/null || true
+  [[ -z "$temp_config" ]] || /bin/rm -f -- "$temp_config" 2>/dev/null || true
+  /bin/rmdir -- "$lock" 2>/dev/null || true
+  (( ! remove_empty_base )) || /bin/rmdir -- "$base" 2>/dev/null || true
+}
+# zsh may skip EXIT after errexit inside a function; ZERR also releases the owned lock.
+trap cleanup EXIT ZERR
+trap 'exit 1' HUP INT TERM
 [[ ! -L "$config" && ( ! -e "$config" || ( -f "$config" && -O "$config" ) ) ]] || exit 1
+for owned in "$base/integration.zsh" "$base/state"; do
+  [[ ! -L "$owned" && ( ! -e "$owned" || ( -f "$owned" && -O "$owned" ) ) ]] || exit 1
+done
+config_existed=0
+[[ ! -f "$config" ]] || config_existed=1
+replace_config() {
+  local replacement=$1 backup
+  if (( config_existed )); then
+    [[ -w "$config" ]] || { print -u2 'Shell configuration is read-only; no changes made.'; return 1; }
+    backup=$(/usr/bin/mktemp "$config.terminal-helper-backup.XXXXXX")
+    /bin/cp -p "$config" "$backup"
+  fi
+  temp_config=$(/usr/bin/mktemp "$config.terminal-helper.XXXXXX")
+  # Preserve existing permissions and ACLs instead of replacing them with temp-file defaults.
+  (( ! config_existed )) || /bin/cp -p "$config" "$temp_config"
+  print -rn -- "$replacement" > "$temp_config"
+  if (( config_existed )); then
+    [[ ! -L "$config" && -f "$config" && -O "$config" && "${mapfile[$config]}" == "$content" ]] || { print -u2 'Shell configuration changed during installation; retry.'; return 1; }
+  else
+    [[ ! -e "$config" && ! -L "$config" ]] || { print -u2 'Shell configuration appeared during installation; retry.'; return 1; }
+  fi
+  /bin/mv -f "$temp_config" "$config"
+  temp_config=''
+}
 start='# >>> Terminal Helper managed integration >>>'
 finish='# <<< Terminal Helper managed integration <<<'
 block=$'\n# >>> Terminal Helper managed integration >>>\n[[ -o interactive && -f "$HOME/Library/Application Support/Terminal Helper/integration.zsh" && ! -L "$HOME/Library/Application Support/Terminal Helper/integration.zsh" ]] && source "$HOME/Library/Application Support/Terminal Helper/integration.zsh"\n# <<< Terminal Helper managed integration <<<\n'
@@ -19,16 +62,9 @@ if [[ "$content" == *"$start"* || "$content" == *"$finish"* ]]; then
 fi
 
 if [[ "$content" == *"$block"* ]]; then
-  backup=$(/usr/bin/mktemp "$config.terminal-helper-backup.XXXXXX")
-  cp -p "$config" "$backup"
-  temp_config=$(/usr/bin/mktemp "$config.terminal-helper.XXXXXX")
-  trap 'rm -f -- "$temp_config"' EXIT
-  print -rn -- "${content//"$block"/}" > "$temp_config"
-  chmod "$(/usr/bin/stat -f %Lp "$config")" "$temp_config"
-  mv -f "$temp_config" "$config"
+  replace_config "${content//"$block"/}"
 fi
-[[ ! -L "$base/integration.zsh" && ! -L "$base/state" ]] || exit 1
-rm -f -- "$base/integration.zsh" "$base/state"
+/bin/rm -f -- "$base/integration.zsh" "$base/state"
 # Missing state disables widgets retained in already-open shells.
-[[ ! -d "$base" ]] || rmdir "$base" 2>/dev/null || true
+remove_empty_base=1
 print 'Integration removed. Restart open shells to restore their original keybindings.'

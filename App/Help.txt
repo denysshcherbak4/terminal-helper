@@ -1,0 +1,41 @@
+TERMINAL HELPER
+Helpful terminal suggestions, with one switch to turn them off.
+
+GET STARTED
+1. In Settings, choose Install shell integration.
+2. Choose Use Home folder for a standard zsh setup. If you configured ZDOTDIR, choose that folder instead. The app remembers the folder after a successful installation for repair and uninstall. A failed operation keeps the previous successful choice. Uninstall clears this preference.
+3. Open a new terminal window. Existing shells need restarting to load the integration.
+4. Turn on Enable suggestions from Settings or the menu-bar icon.
+
+USING SUGGESTIONS
+Press Tab to request a compact completion list. Use arrow keys to select, Enter to insert the selected text, or Escape to cancel. Accepting edits the command line only. Press Enter again after the list closes to execute deliberately.
+
+Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects.
+
+OFF AND QUIT
+Turn off Enable suggestions to stop assistance. Open shells check state at their next completion or acceptance. An existing completion menu may remain visible until that interaction. The idle menu-bar app stays resident while Off.
+
+Disable and Quit writes Off, terminates any app-owned installer workers, and exits. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
+
+TROUBLESHOOTING
+If Enable suggestions is unavailable, install shell integration first and wait for installation to finish.
+
+If nothing appears after Tab, open a new terminal window and check that you are running interactive zsh. The menu reports whether the integration file exists; it cannot verify which already-open shells loaded it. Use Repair shell integration when needed.
+
+Custom ZDOTDIR: choose the folder containing your actual .zshrc. The app does not evaluate .zshenv or other shell configuration to discover it. You can choose a different folder during installation, repair, or uninstall.
+
+Installation failures: check that your configuration folder belongs to you and is writable. Symlinked or unsafe configuration is rejected. Your existing .zshrc is never overwritten as a whole; the installer uses a narrow, marked block and makes a backup. Existing user-configured completion code runs with your user privileges.
+
+If an interrupted installation reports that another operation is in progress, first ensure no install or uninstall is still running. A forced Quit can leave an empty lock folder. Remove only that empty folder with this command, then retry:
+
+rmdir "$HOME/Library/Application Support/Terminal Helper/.integration-lock"
+
+rmdir refuses to remove a nonempty folder. Do not delete other Terminal Helper files as lock recovery.
+
+UNINSTALL
+Choose Uninstall shell integration in Settings and use the same configuration folder. Restart open terminal shells, choose Disable and Quit, then remove Terminal Helper from Applications. Keep any configuration backup you want to retain.
+
+PRIVACY AND COMPATIBILITY
+No command history, command buffers, environment contents, or filenames are logged or uploaded. There is no cloud service, telemetry, global keyboard monitoring, or background indexing. No Accessibility or screen-recording permission is needed.
+
+The test build targets macOS 13 or later on Apple silicon and Intel. Automated macOS runner tests are documented separately; physical Terminal.app and iTerm2 behavior needs the documented manual verification. Ad-hoc test builds are not Developer ID signed or notarized. Do not disable Gatekeeper to run them.

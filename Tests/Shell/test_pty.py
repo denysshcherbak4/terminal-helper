@@ -142,6 +142,33 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual(candidate.read_text(), 'KEEP')
         self.assertEqual(important.read_text(), 'KEEP')
 
+    def test_edit_after_unique_completion_keeps_ordinary_enter(self):
+        self.complete('cat note')
+        self.shell.send('\x15print EDITED_ENTER_WORKS\r')
+        out = self.shell.read()
+        self.assertIn('EDITED_ENTER_WORKS\r\n', out)
+        self.assertNotIn('DUMP:', out)
+
+    def test_custom_native_menu_bindings_are_restored(self):
+        self.shell.send("zmodload zsh/complist; function custom_menu_key() { zle -M CUSTOM_MENU; }; zle -N custom_menu_key; bindkey -M menuselect '^M' custom_menu_key\n")
+        self.shell.read()
+        (self.home / 'ChoiceOne').mkdir()
+        (self.home / 'ChoiceTwo').mkdir()
+        for ending in ('\r', '\x1b'):
+            self.complete('cd Cho')
+            self.shell.send(ending)
+            self.shell.read(0.5)
+            self.shell.send('\x15bindkey -M menuselect "^M"\r')
+            out = self.shell.read()
+            self.assertIn('custom_menu_key', out)
+            self.assertNotIn('_th_menu_accept', out)
+        self.complete('cd Cho')
+        self.state(False)
+        self.shell.send('\r')
+        self.shell.read()
+        self.shell.send('\x15bindkey -M menuselect "^M"\r')
+        self.assertIn('custom_menu_key', self.shell.read())
+
     def test_typo(self):
         self.complete('cd ' + str(self.home) + '/dents')
         self.shell.send('\r')
@@ -292,6 +319,15 @@ class CompletionTests(unittest.TestCase):
         time.sleep(0.5)
         out = self.shell.buffer()
         self.assertIn('DUMP:"cd Cho":6', out)
+
+    def test_disable_during_arrow_menu_restores_original(self):
+        (self.home / 'ChoiceOne').mkdir()
+        (self.home / 'ChoiceTwo').mkdir()
+        self.complete('cd Cho')
+        self.state(False)
+        self.shell.send('\x1b[B\r')
+        self.shell.read()
+        self.assertIn('DUMP:"cd Cho":6', self.shell.buffer())
 
     def test_arrow_navigation_and_enter_only_edits(self):
         (self.home / 'ChoiceOne').mkdir()

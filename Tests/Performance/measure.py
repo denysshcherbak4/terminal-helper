@@ -16,36 +16,49 @@ RESULTS.mkdir(exist_ok=True)
 def percentile(values, fraction=.95):
     return sorted(values)[max(0, int(len(values) * fraction + .999999) - 1)]
 
-def launch_ms(script, env):
+source_phase_ms = []
+
+def launch_ms(script, env, capture_source=False):
     started = time.perf_counter()
-    subprocess.run(["/bin/zsh", "-d", "-f", "-i", "-c", script], env=env,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    completed = subprocess.run(["/bin/zsh", "-d", "-f", "-i", "-c", script], env=env,
+                   stdout=subprocess.PIPE if capture_source else subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=20, text=True)
+    if capture_source:
+        marker = [line for line in completed.stdout.splitlines() if line.startswith("TH_SOURCE_MS=")]
+        assert len(marker) == 1, "Missing isolated source-time measurement"
+        elapsed = float(marker[0].split("=", 1)[1])
+        assert 0 <= elapsed < 20000, "Invalid isolated source-time measurement"
+        source_phase_ms.append(elapsed)
     return (time.perf_counter() - started) * 1000
 
 with tempfile.TemporaryDirectory(prefix="terminal-helper-measure-") as temporary:
     env = dict(os.environ, HOME=temporary, ZDOTDIR=temporary)
     # Existing compinit is identical in both arms; integration startup does not generate suggestions.
-    base = "autoload -Uz compinit; compinit -D; exit"
+    base = "autoload -Uz compinit; compinit -D; zmodload zsh/datetime; exit"
     source = str(ROOT / "Integration" / "terminal-helper.zsh").replace("'", "'\\''")
-    integrated = "autoload -Uz compinit; compinit -D; source '" + source + "'; exit"
-    cold = {"baseline_ms": launch_ms(base, env), "integrated_ms": launch_ms(integrated, env)}
+    integrated = "autoload -Uz compinit; compinit -D; zmodload zsh/datetime; float th_started=$EPOCHREALTIME; source '" + source + "'; printf 'TH_SOURCE_MS=%.6f\\n' $(( (EPOCHREALTIME-th_started)*1000 )); exit"
+    cold = {"baseline_ms": launch_ms(base, env), "integrated_ms": launch_ms(integrated, env, capture_source=True)}
     baseline, enabled = [], []
     for repetition in range(40):
         # Alternate ordering to reduce systematic cache/order bias.
         if repetition % 2:
-            enabled.append(launch_ms(integrated, env)); baseline.append(launch_ms(base, env))
+            enabled.append(launch_ms(integrated, env, capture_source=True)); baseline.append(launch_ms(base, env))
         else:
-            baseline.append(launch_ms(base, env)); enabled.append(launch_ms(integrated, env))
+            baseline.append(launch_ms(base, env)); enabled.append(launch_ms(integrated, env, capture_source=True))
     added = [e-b for b, e in zip(baseline, enabled)]
     startup = {"repetitions": 40, "method": "paired fresh zsh -d -f -i subprocesses; identical compinit -D; wall-clock; no cache flush",
                "cold_first_observation": cold, "baseline_p95_ms": percentile(baseline),
                "integrated_p95_ms": percentile(enabled), "paired_added_p95_ms": percentile(added),
                "paired_added_median_ms": statistics.median(added), "target_added_p95_ms": 30}
     startup["target_met_on_runner"] = startup["paired_added_p95_ms"] <= 30
+    assert len(source_phase_ms) == 41, "Source phase count must include first observation and 40 warm samples"
+    startup["isolated_source_first_ms"] = source_phase_ms[0]
+    startup["isolated_source_p95_ms"] = percentile(source_phase_ms[1:])
+    startup["isolated_source_method"] = "In-process EPOCHREALTIME around source only; excludes compinit and scheduling outside the source phase; supplements paired wall-clock, does not replace it"
 
 app = ROOT / "dist" / "Terminal Helper.app" / "Contents" / "MacOS" / "TerminalHelper"
-subprocess.run([str(app), "--ui-smoke-test", str(RESULTS / "native-settings.png")], check=True, timeout=20)
-process = subprocess.Popen([str(app)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+for appearance in ("light", "dark"):
+    subprocess.run([str(app), "--appearance", appearance, "--ui-smoke-test", str(RESULTS / ("native-settings-" + appearance + ".png"))], check=True, timeout=20)
+process = subprocess.Popen([str(app), "--measure-idle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 samples = []
 try:
     time.sleep(2)
@@ -69,7 +82,7 @@ report = {
     "platform": platform.platform(), "architecture": platform.machine(),
     "hardware": subprocess.check_output(["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip(),
     "startup": startup,
-    "controller_off": {"method": "fresh controller, no integration installed/state enabled, 2s settle, six 1s ps RSS/%CPU samples; %CPU is OS process average",
+    "controller_off": {"method": "menu-only controller (--measure-idle), no integration installed/state enabled, 2s settle, six 1s ps RSS/%CPU samples; %CPU is OS process average",
                        "samples": samples, "process_count": 1,
                        "rss_median_kib": statistics.median(s["rss_kib"] for s in samples),
                        "cpu_max_percent": max(s["cpu_percent"] for s in samples),
