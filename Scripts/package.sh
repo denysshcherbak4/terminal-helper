@@ -1,14 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version="${VERSION:-0.1.0}"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'VERSION must be numeric major.minor.patch' >&2; exit 1; }
 [[ "$(uname -s)" == Darwin ]] || { echo 'Packaging requires macOS.' >&2; exit 1; }
 source_sha="${SOURCE_SHA:-${GITHUB_SHA:-}}"
 if [[ -z "$source_sha" ]]; then source_sha="$(git rev-parse HEAD)"; fi
 [[ "$source_sha" =~ ^[0-9a-fA-F]{7,40}$ ]] || { echo 'SOURCE_SHA must identify the source commit.' >&2; exit 1; }
 app='dist/Terminal Helper.app'
 [[ -d "$app" && -f "$app/Contents/MacOS/TerminalHelper" ]] || { echo 'Run Scripts/build.sh first.' >&2; exit 1; }
+version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Bundle version must be numeric major.minor.patch.' >&2; exit 1; }
+[[ -z "${VERSION:-}" || "$VERSION" == "$version" ]] || { echo 'VERSION does not match the built app. Rebuild before packaging.' >&2; exit 1; }
 codesign --verify --strict "$app"
 mkdir -p build dist
 stage="$(mktemp -d build/dmg-stage.XXXXXX)"
@@ -47,5 +48,13 @@ xcrun lipo -verify_arch arm64 x86_64 "$mount/Terminal Helper.app/Contents/MacOS/
 codesign --verify --strict "$mount/Terminal Helper.app"
 hdiutil detach "$mount" -quiet
 mounted=0
-(cd dist && shasum -a 256 "$name" > "$name.sha256" && files=(./*.zip ./*.dmg); for file in "${files[@]}"; do [[ ! -f "$file" ]] || shasum -a 256 "$file"; done > SHA256SUMS)
+(
+    cd dist
+    shasum -a 256 "$name" > "$name.sha256"
+    files=(./*.zip ./*.dmg)
+    for file in "${files[@]}"; do
+        [[ ! -f "$file" ]] || shasum -a 256 "$file"
+    done > SHA256SUMS.txt
+)
+rm -f dist/SHA256SUMS
 printf 'Packaged dist/%s (engineering test build; not notarized)\n' "$name"

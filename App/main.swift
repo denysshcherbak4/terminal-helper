@@ -327,6 +327,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let script = Bundle.main.url(forResource: operation, withExtension: "zsh", subdirectory: "Integration") else {
             report("Integration unavailable", detail: "Reinstall this app from a complete build."); return
         }
+        var selectedDirectory = configurationDirectory
         let choice = NSAlert()
         choice.messageText = "Choose your shell configuration"
         choice.informativeText = "Use your home folder for a standard zsh setup. If you configured ZDOTDIR, choose that folder instead. Current folder: " + configurationDirectory.path
@@ -342,17 +343,25 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             chooser.canChooseDirectories = true; chooser.canChooseFiles = false; chooser.allowsMultipleSelection = false
             chooser.directoryURL = configurationDirectory
             guard chooser.runModal() == .OK, let selected = chooser.url else { return }
-            configurationDirectory = selected
+            selectedDirectory = selected
         default: return
         }
-        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": configurationDirectory.path]
+        let environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "ZDOTDIR": selectedDirectory.path]
         do {
             operationStatus = operation == "install" ? "Installing shell integration…" : "Uninstalling shell integration…"
             worker = try IntegrationWorker(arguments: ["-f", script.path], environment: environment) { status in
                 self.worker = nil
                 if self.quitting { self.finishQuit(); return }
                 self.operationStatus = status == 0 ? (operation == "install" ? "Installed. Open a new terminal window, then enable suggestions." : "Uninstalled. Restart open terminal shells.") : "Integration update failed. Check ownership and permissions; see Help."
-                if status == 0 { UserDefaults.standard.set(self.configurationDirectory.path, forKey: "ShellConfigurationDirectory") }
+                if status == 0 {
+                    if operation == "install" {
+                        self.configurationDirectory = selectedDirectory
+                        UserDefaults.standard.set(selectedDirectory.path, forKey: "ShellConfigurationDirectory")
+                    } else {
+                        UserDefaults.standard.removeObject(forKey: "ShellConfigurationDirectory")
+                        self.configurationDirectory = FileManager.default.homeDirectoryForCurrentUser
+                    }
+                }
                 self.refresh()
                 self.report(status == 0 ? "Shell integration updated" : "Shell integration could not be updated", detail: status == 0 ? "Open a new terminal shell to use the updated configuration." : "Check that your shell configuration and Terminal Helper folder belong to you and are writable. See the troubleshooting guide; no configuration is overwritten.")
             }

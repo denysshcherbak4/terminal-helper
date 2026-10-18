@@ -3,7 +3,7 @@ Helpful terminal suggestions, with one switch to turn them off.
 
 GET STARTED
 1. In Settings, choose Install shell integration.
-2. Choose Use Home folder for a standard zsh setup. If you configured ZDOTDIR, choose that folder instead. The app remembers your choice for repair and uninstall.
+2. Choose Use Home folder for a standard zsh setup. If you configured ZDOTDIR, choose that folder instead. The app remembers the folder after a successful installation for repair and uninstall. A failed operation keeps the previous successful choice. Uninstall clears this preference.
 3. Open a new terminal window. Existing shells need restarting to load the integration.
 4. Turn on Enable suggestions from Settings or the menu-bar icon.
 
@@ -25,6 +25,12 @@ If nothing appears after Tab, open a new terminal window and check that you are 
 Custom ZDOTDIR: choose the folder containing your actual .zshrc. The app does not evaluate .zshenv or other shell configuration to discover it. You can choose a different folder during installation, repair, or uninstall.
 
 Installation failures: check that your configuration folder belongs to you and is writable. Symlinked or unsafe configuration is rejected. Your existing .zshrc is never overwritten as a whole; the installer uses a narrow, marked block and makes a backup. Existing user-configured completion code runs with your user privileges.
+
+If an interrupted installation reports that another operation is in progress, first ensure no install or uninstall is still running. A forced Quit can leave an empty lock folder. Remove only that empty folder with this command, then retry:
+
+rmdir "$HOME/Library/Application Support/Terminal Helper/.integration-lock"
+
+rmdir refuses to remove a nonempty folder. Do not delete other Terminal Helper files as lock recovery.
 
 UNINSTALL
 Choose Uninstall shell integration in Settings and use the same configuration folder. Restart open terminal shells, choose Disable and Quit, then remove Terminal Helper from Applications. Keep any configuration backup you want to retain.
