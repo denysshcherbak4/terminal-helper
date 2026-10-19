@@ -108,6 +108,7 @@ _th_tab() {
   _th_supported || { zle -M 'Terminal Helper: unsupported syntax; input unchanged'; return 0; }
   if (( ! _TH_READY )); then
     zmodload zsh/complist || return 0
+    zle -C _th_completion .menu-select _th_completion
     autoload -Uz add-zle-hook-widget
     add-zle-hook-widget line-pre-redraw _th_redraw
     add-zle-hook-widget line-finish _th_line_finish
@@ -148,7 +149,7 @@ _th_tab() {
 }
 
 _th_completion() {
-  local MENUSELECT=1 LISTMAX=20
+  local LISTMAX=20
   _main_complete _complete _th_correct
   if (( compstate[nmatches] )); then
     compstate[insert]=menu
@@ -251,7 +252,6 @@ zle -N _th_newline
 zle -N _th_accept
 zle -N _th_menu_accept
 zle -N _th_cancel
-zle -C _th_completion complete-word _th_completion
 # Tab is the explicit opt-in binding; Enter delegates unchanged when idle.
 bindkey '^I' _th_tab
 bindkey '^M' _th_return

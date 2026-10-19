@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Actual interactive ZLE checks; no dependency beyond Python 3 and system zsh."""
 import json
+import fcntl
+import struct
+import termios
 import os
 from pathlib import Path
 import pty
@@ -21,6 +24,7 @@ class Shell:
             env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
                    'TERM': 'xterm-256color', 'LC_ALL': 'en_US.UTF-8'}
             os.execve('/bin/zsh', ['zsh', '-f'], env)
+        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 60, 0, 0))
         self.read()
         completion_setup = "autoload -Uz compinit; compinit -D; " if initialize_completion else ""
         self.send("PROMPT='TH> '; RPROMPT=''; setopt no_beep; bindkey -e; "
@@ -345,8 +349,6 @@ class CompletionTests(unittest.TestCase):
         names = ['Choice_%02d_long_directory_name_for_single_column' % i for i in range(1, 5)]
         for name in names:
             (self.home / name).mkdir()
-        self.shell.send('COLUMNS=60; LINES=24\n')
-        self.shell.read()
         out = self.complete('cd Choice_')
         self.assertRegex(out, r'\x1b\[[0-9;]*7m', 'Active candidate must be visibly reverse-highlighted')
         self.shell.send('\x1b[B\x1b[B\x1b[A\r')
