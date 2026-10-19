@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Actual interactive ZLE checks; no dependency beyond Python 3 and system zsh."""
 import json
+import fcntl
+import struct
+import termios
 import os
 from pathlib import Path
 import pty
@@ -21,11 +24,12 @@ class Shell:
             env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
                    'TERM': 'xterm-256color', 'LC_ALL': 'en_US.UTF-8'}
             os.execve('/bin/zsh', ['zsh', '-f'], env)
+        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 60, 0, 0))
         self.read()
         completion_setup = "autoload -Uz compinit; compinit -D; " if initialize_completion else ""
         self.send("PROMPT='TH> '; RPROMPT=''; setopt no_beep; bindkey -e; "
                   + completion_setup +
-                  "function dump_buffer() { print -r --; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
+                  "function dump_buffer() { print -r --; print -r -- DIRECTORY:${(qqq)PWD}; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
                   "zle -N dump_buffer; bindkey '^]' dump_buffer; print -r -- TH'_'READY\n")
         self.wait_for('TH_READY\r\n')
         if custom_enter:
@@ -168,6 +172,25 @@ class CompletionTests(unittest.TestCase):
         self.shell.read()
         self.shell.send('\x15bindkey -M menuselect "^M"\r')
         self.assertIn('custom_menu_key', self.shell.read())
+
+
+    def test_native_menu_macro_is_restored_without_running_it(self):
+        self.shell.send("zmodload zsh/complist; bindkey -M menuselect -s '^M' 'MACRO_LITERAL \"quoted\" $(touch MENU_MACRO_RAN)'; bindkey -M menuselect -L '^M'\n")
+        before = self.shell.read()
+        original = next(line for line in before.splitlines() if line.startswith('bindkey ') and 'menuselect' in line and ' -s ' in line)
+        for name in ['ChoiceOne', 'ChoiceTwo']:
+            (self.home / name).mkdir()
+        for ending, disable in [('\r', False), ('\x1b', False), ('\r', True)]:
+            self.state(True)
+            self.complete('cd Cho')
+            if disable:
+                self.state(False)
+            self.shell.send(ending)
+            self.shell.read(0.5)
+            self.shell.send("\x15bindkey -M menuselect -L '^M'\r")
+            after = self.shell.read()
+            self.assertIn(original, after)
+            self.assertFalse((self.home / 'MENU_MACRO_RAN').exists())
 
     def test_typo(self):
         self.complete('cd ' + str(self.home) + '/dents')
@@ -339,6 +362,57 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('DUMP:', out)
         self.assertIn('Choice', out)
         self.assertIn('cd ', out)
+
+
+
+
+    def test_down_arrow_selects_second_short_candidate_in_same_row(self):
+        for name in ['ChoiceOne', 'ChoiceTwo']:
+            (self.home / name).mkdir()
+        self.complete('cd Cho')
+        self.shell.send('\x1b[B\r')
+        self.shell.read()
+        self.assertIn('DUMP:"cd ChoiceTwo/":13', self.shell.buffer())
+
+    def test_arrow_navigation_selects_exact_nonfirst_candidate(self):
+        names = ['Choice_%02d_long_directory_name_for_single_column' % i for i in range(1, 5)]
+        for name in names:
+            (self.home / name).mkdir()
+        for down, up in [('\x1b[B', '\x1b[A'), ('\x1bOB', '\x1bOA')]:
+            with self.subTest(down=repr(down)):
+                self.shell.send('\x15')
+                out = self.complete('cd Choice_')
+                self.assertRegex(out, r'\x1b\[[0-9;]*7m',
+                                 'Active candidate must be visibly reverse-highlighted')
+                self.shell.send(down + down + up + '\r')
+                self.shell.read()
+                out = self.shell.buffer()
+                expected = 'cd ' + names[1] + '/'
+                self.assertIn('DUMP:"' + expected + '":' + str(len(expected)), out)
+                self.assertIn('DIRECTORY:"' + str(self.home) + '"', out)
+
+    def test_long_menu_scroll_selects_candidate_beyond_visible_rows(self):
+        names = ['Scroll_%02d_long_directory_name_for_single_column' % i for i in range(1, 15)]
+        for name in names:
+            (self.home / name).mkdir()
+        fcntl.ioctl(self.shell.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 8, 60, 0, 0))
+        os.kill(self.shell.pid, signal.SIGWINCH)
+        self.complete('cd Scroll_')
+        self.shell.send('\x1b[B' * 10 + '\r')
+        self.shell.read()
+        out = self.shell.buffer()
+        self.assertIn('DUMP:"cd ' + names[10] + '/":', out)
+        self.assertIn('DIRECTORY:"' + str(self.home) + '"', out)
+
+    def test_arrow_selection_escape_restores_middle_cursor_and_suffix(self):
+        for name in ['Choice_01_long_directory_name', 'Choice_02_long_directory_name']:
+            (self.home / name).mkdir()
+        original = 'cat Choice_ tail'
+        self.shell.send(original + '\x1b[D' * 5 + '\t')
+        self.shell.read(0.8)
+        self.shell.send('\x1b[B\x1b')
+        self.shell.read(0.5)
+        self.assertIn('DUMP:"' + original + '":11', self.shell.buffer())
 
     def test_executable_completion(self):
         self.complete('pytho')

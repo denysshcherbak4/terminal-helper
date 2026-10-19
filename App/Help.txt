@@ -15,7 +15,7 @@ GET STARTED
 4. Turn on Enable suggestions from Settings or the menu-bar icon.
 
 USING SUGGESTIONS
-Press Tab to request a compact completion list. Use arrow keys to select, Enter to insert the selected text, or Escape to cancel. Accepting edits the command line only. Press Enter again after the list closes to execute deliberately.
+Press Tab to request a compact completion list. The current choice is reverse-highlighted. Use arrow keys to move through the list (including rows beyond the visible area), Enter to insert the selected text, or Escape to cancel. Accepting edits the command line only. Press Enter again after the list closes to execute deliberately.
 
 Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects.
 
