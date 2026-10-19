@@ -136,7 +136,7 @@ _th_doctor() {
   print -r -- 'Off delegates your original Tab; it disables Terminal Helper corrections.'
   print -r -- 'While On, unsupported input declines native expansion widgets; custom widget behavior remains yours.'
   print -r -- 'To refresh bindings, open a new shell after loading completion plugins.'
-  print -r -- 'To remove integration, use Settings > Remove Shell Integration, then open a new shell.'
+  print -r -- 'To remove integration, use Settings > Uninstall shell integration…, then open a new shell.'
 }
 
 _th_supported() {

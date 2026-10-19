@@ -576,7 +576,9 @@ class CompletionTests(unittest.TestCase):
             self.state(enabled)
             self.shell.send('\x15' + text + '\t')
             self.shell.read()
-            self.assertIn('DUMP:"' + text + 'ORIGINAL_TAB":', self.shell.buffer())
+            expected = text + 'ORIGINAL_TAB'
+            quoted = expected.replace('$', '\\$')
+            self.assertIn('DUMP:"' + quoted + '":' + str(len(expected)), self.shell.buffer())
 
     def test_tab_macro_is_not_wrapped_and_doctor_does_not_expose_payload(self):
         self.shell.close()
