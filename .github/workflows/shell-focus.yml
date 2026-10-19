@@ -35,3 +35,7 @@ jobs:
                   finally:
                       shell.close()
           PY
+      - name: Foundation management regressions
+        run: python3 Tests/Shell/test_cli.py
+      - name: Foundation interactive regressions
+        run: python3 Tests/Shell/test_pty.py

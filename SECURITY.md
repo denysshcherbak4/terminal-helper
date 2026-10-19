@@ -39,3 +39,6 @@ The independent review reads source through GitHub APIs. The formal Codex Securi
 ## Binding and diagnostic boundary (development build)
 
 Capture supported original widget bindings per keymap once. Off and unsupported custom-correction syntax delegate to that original widget without evaluating the buffer. Unsafe key macros must remain untouched. Never reclaim a later plugin binding automatically; repeated sourcing/toggles must not stack wrappers. Pending helper acceptance rechecks state, and native menu bindings must be restored. Doctor collects live facts in the invoking shell; an app subprocess must not pretend to know its parent shell widgets. Do not expose macro payloads, environment contents or command history.
+
+
+Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

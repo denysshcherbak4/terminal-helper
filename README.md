@@ -127,3 +127,6 @@ The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in
 ## Diagnose this shell (development preview)
 
 Run terminal-helper doctor in the affected interactive zsh. It distinguishes app metadata from the integration loaded in that shell, shared state and live Tab ownership/conflicts. It never repairs configuration or prints history, command buffers, macro payloads or environment values. Restart shells after integration upgrades; later plugin bindings remain authoritative. Unsupported custom-correction syntax delegates to the original supported completion widget, whose existing third-party code retains its own trust boundary.
+
+
+Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

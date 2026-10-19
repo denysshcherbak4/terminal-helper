@@ -55,3 +55,6 @@ The request reuses bounded public-release metadata validation. Off cancels it, a
 The integration captures supported widget bindings per emacs/viins map once and delegates Tab while Off or outside custom correction syntax. Unsafe macros stay untouched; later plugin bindings remain authoritative. Enable/disable changes shared state, not the wrapper stack. A native menu may remain until it closes, with state rechecked before accepting helper text. No polling or per-keystroke process is added.
 
 terminal-helper doctor collects this shell's loaded integration, current keymap and binding ownership in-process, separately from the app's version metadata. It reports missing/unsafe state and conflicts with reversible next steps, never repairs automatically or emits private input/history/environment values.
+
+
+Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

@@ -48,3 +48,6 @@
 
 
 **Doctor reports different versions.** App metadata and the integration already loaded in an open shell are separate facts. Restart that shell after installing/upgrading integration; running a new app cannot replace live widgets inside another process. Doctor only explains problems and never repairs files.
+
+
+Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

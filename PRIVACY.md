@@ -37,3 +37,6 @@ GitHub hosting/downloads, Apple operating-system security checks and optional re
 ## Explicit shell diagnostics (development build)
 
 terminal-helper doctor runs in the shell where you invoke it. It reads bounded owned state/app metadata and current keybinding ownership to distinguish installation from a loaded integration. It does not repair configuration, inspect history, print command buffers or macro payloads, or dump environment values. App metadata cannot prove which code an already-open shell loaded. No diagnostic information is uploaded.
+
+
+Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.
