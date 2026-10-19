@@ -12,6 +12,8 @@ Use the [exact remote-runner commands](README.md#verification-and-development). 
 
 Updater fixtures create and remove their bundles/support data in the runner account's **actual home**. Use only a disposable remote macOS runner with no running Terminal Helper instance, no existing `~/Applications/Terminal Helper.app` and no existing `~/Library/Application Support/Terminal Helper`. Tests refuse existing paths; do not delete a real installation to make them run. Personal-Mac installation or testing requires separate authorization.
 
+The automatic policy fixture additionally includes `App/UpdateNotices.swift`; the native `--update-notice-self-test` injects release responses and private preference/state fixtures without network access.
+
 The native `--termination-self-test` and `--update-cancel-self-test` exercise external quit and cancellation of update/integration workers using fixture state. The controller fixture launches an unquarantined CI-built copy, so it does not establish the downloaded-app Gatekeeper or human upgrade flow. Keep explicit SKIP outcomes and failed/cancelled runs separate from verified results.
 
 For bugs, give the commit/app version, macOS/zsh/terminal versions and a synthetic reproduction. Never paste real command history, secrets, private paths or environment dumps. Report security problems through the private route in SECURITY.md.

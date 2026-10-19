@@ -49,6 +49,12 @@ Requested installation verifies the download, replaces the app and owned integra
 keeps a recovery copy, and reopens through macOS security checks. Restart terminal
 windows and enable suggestions afterward. No background polling or sudo is used.
 
+From 0.3.1, enabled automatic checks request release metadata on app launch or
+when suggestions are enabled, at most once per 24 hours. Suggestions must be On.
+No recurring timer is installed. Settings can disable automatic checks. Notices
+offer Update Now, Remind Me Later or Skip This Version; downloads/installations
+still require your action. Manual checks work while Off and ignore skipped versions.
+
 This disk image does not install or execute anything automatically.
 HELP
 name="Terminal-Helper-${version}-universal.dmg"
