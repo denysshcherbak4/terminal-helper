@@ -42,3 +42,6 @@
 **Does Remind Me Later schedule tomorrow's notification?** No. It keeps the version eligible for the next launch/enable event after the attempt's 24-hour window. There is no daily timer or midnight check. Skip This Version suppresses only that version's automatic offer; a future newer version can still appear when eligible.
 
 **I do not want automatic metadata requests.** Disable Check for updates automatically in Settings; the choice is remembered. Suggestions Off also prevents automatic checks and cancels pending ones. This does not disable explicit Check for Updates or `terminal-helper check/update`. Automatic checks fetch metadata only; downloading/installing still requires Update Now or an explicit update command.
+
+
+**Tab lists matches but arrows do not move a highlight.** Versions through 0.3.1 could start plain completion instead of native menu selection. The 0.3.2 fix starts zsh menu selection explicitly. Once 0.3.2 is published, use terminal-helper update, restart terminal windows and enable suggestions. A source commit or draft alone does not update an installed app. In a selectable list, arrows move the reverse-highlighted choice; Enter inserts it without executing.
