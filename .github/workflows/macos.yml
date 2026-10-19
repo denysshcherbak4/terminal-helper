@@ -52,6 +52,11 @@ jobs:
         run: |
           swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateInstaller/main.swift -o build-installer-tests -framework AppKit -framework CoreServices
           ./build-installer-tests | tee results/update-install-tests.txt
+      - name: Automatic update policy tests
+        if: always() && !cancelled()
+        run: |
+          swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift App/UpdateNotices.swift Tests/UpdateNotices/main.swift -o build-notice-tests -framework AppKit -framework CoreServices
+          ./build-notice-tests | tee results/update-notice-policy-tests.txt
       - name: ZLE tests
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
@@ -97,6 +102,10 @@ jobs:
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: |
           python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--settings-self-test"], check=True, timeout=45)' | tee results/settings-tests.txt
+      - name: Native automatic update notice tests
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: |
+          python3 -c 'import subprocess; subprocess.run(["dist/Terminal Helper.app/Contents/MacOS/TerminalHelper", "--update-notice-self-test"], check=True, timeout=45)' | tee results/update-notice-ui-tests.txt
       - name: Controller lifecycle test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: |
