@@ -38,7 +38,9 @@ A matching invocation path is reported as resolution evidence, not runtime proof
 
 ## When it declines
 
-The checker leaves input unchanged for unsupported or ambiguous cases: aliases/functions, wrapper command prefixes, target options, operators, substitutions, redirects, glob expressions, multiline input, missing or malformed metadata, conflicting environments, a different explicitly active environment, and detectable remote/container contexts.
+The checker leaves input unchanged for unsupported or ambiguous cases (including abbreviated target options and combined/attached short flags): aliases/functions, wrapper command prefixes, target options, operators, substitutions, redirects, glob expressions, multiline input, missing or malformed metadata, conflicting environments, a different explicitly active environment, and detectable remote/container contexts.
+
+Environment-shaped siblings named venv or env, and known active-environment markers, trigger a refusal. Arbitrary environment locations are not discovered.
 
 Known Python/pip target or configuration overrides are declined without printing their values. The checker does not inspect all pip configuration files. pip configuration can change installation behavior, so using an explicit interpreter is not a guarantee about the final package destination. See [pip configuration](https://pip.pypa.io/en/stable/topics/configuration/).
 
@@ -51,3 +53,11 @@ The buffer is inspected in memory for this interaction and is not logged, stored
 Run terminal-helper doctor in the affected shell to distinguish app metadata, loaded integration and binding ownership. Keep another plugin's shortcut or deliberately choose your own binding; the helper never silently takes it. Finish or dismiss an active completion menu before checking a command.
 
 Restart shells after installing/updating integration. No personal-Mac installation is implied by a CI pass; actual Terminal.app/iTerm2 and VoiceOver behavior remain manual checks.
+
+## Install a test build
+
+Use only an artifact from a complete successful ARM/Intel run for the exact PR commit. The PR description links that run and its artifacts. GitHub may require sign-in for CI artifact downloads; the published community beta remains available without sign-in.
+
+Download one Terminal-Helper artifact, unzip the artifact wrapper, and verify the contained DMG against SHA256SUMS.txt before opening it. Both runner artifacts contain a universal app; choose one. Use the DMG installation flow in the README. The app is ad-hoc signed, not notarized, so Apple's per-app approval may still be necessary. Do not remove quarantine or disable Gatekeeper.
+
+After replacing the app, open Settings and update shell integration if prompted, restart shells and enable suggestions. This preview is not offered by terminal-helper update until a maintainer publishes it. Testing on a personal Mac is a separate user decision; all repository tests run on disposable remote macOS runners.

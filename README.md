@@ -2,6 +2,8 @@
 
 **Choose the right command, in the right environment, without leaving your terminal.**
 
+**Development branch:** Python assistance is in [PR #9](https://github.com/denysshcherbak4/terminal-helper/pull/9), based on [foundation PR #8](https://github.com/denysshcherbak4/terminal-helper/pull/8). The public download below remains v0.3.2. [How to test the exact CI build](Docs/PYTHON-ASSISTANCE.md#install-a-test-build).
+
 ## Install on your Mac
 
 [**Download for Mac — v0.3.2 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.3.2/Terminal-Helper-0.3.2-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)

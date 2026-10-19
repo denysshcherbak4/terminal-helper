@@ -449,7 +449,7 @@ _th_python_read_cfg() {
 _th_python_inspect() {
   emulate -L zsh
   setopt extendedglob
-  local raw=$1 ch quote_mode=plain escaped=0 index forbidden cmd prefix_count rest leading token decoded kind resolved env_dir interpreter sibling
+  local raw=$1 ch quote_mode=plain escaped=0 index forbidden cmd prefix_count rest leading token decoded option blocked kind resolved env_dir interpreter sibling
   local -a tokens
   _TH_PY_STATUS=unsupported _TH_PY_MESSAGE='Only simple pip install or python -m pip install input is supported; unchanged.'
   _TH_PY_SUGGESTION='' _TH_PY_SIGNATURE='' _TH_PY_CFG_SIGNATURE=''
@@ -486,6 +486,18 @@ _th_python_inspect() {
   fi
   for token in "${tokens[@]:$prefix_count}"; do
     decoded=${(Q)token}
+    # pip accepts abbreviated long options and clustered short options. Decline
+    # these targeting spellings conservatively instead of reproducing its parser.
+    if [[ "$decoded" == --?* ]]; then
+      option=${decoded%%=*}
+      for blocked in --target --prefix --root --python --user --platform --python-version --implementation --abi; do
+        if [[ "$blocked" == "$option"* ]]; then
+          _TH_PY_MESSAGE='A pip target/runtime option or abbreviation is present; unchanged.'; return 0
+        fi
+      done
+    elif [[ "$decoded" == -[^-]?* ]]; then
+      _TH_PY_MESSAGE='Clustered short options or attached option values are unsupported; unchanged.'; return 0
+    fi
     case "$decoded" in
       --target|--target=*|-t|-t?*|--prefix|--prefix=*|--root|--root=*|--python|--python=*|--user|--platform|--platform=*|--python-version|--python-version=*|--implementation|--implementation=*|--abi|--abi=*)
         _TH_PY_MESSAGE='Explicit pip target/runtime options are present; context is not inferred.'; return 0 ;;
@@ -524,7 +536,7 @@ _th_python_inspect() {
   resolved=$(builtin whence -- "$cmd" 2>/dev/null)
   [[ -n "$resolved" && ${#resolved} -le 512 && "$resolved" != *[[:cntrl:]]* && -f "$resolved" && -x "$resolved" ]] || return 0
   kind=$(builtin whence -w -- "$interpreter" 2>/dev/null)
-  [[ "$kind" == "${interpreter}: command" || "$kind" == "${interpreter}: hashed" ]] || return 0
+  [[ "$kind" == *': command' || "$kind" == *': hashed' ]] || return 0
   _TH_PY_SIGNATURE=$_TH_PY_CFG_SIGNATURE
   for token in "$PWD" "$env_dir" "$interpreter" "$resolved"; do
     _th_python_stamp "$token" link || { _TH_PY_STATUS=invalid; return 0; }
@@ -649,10 +661,12 @@ _th_python_shortcut_status() {
   local -a binding fields
   REPLY=unavailable
   bindkey -M "$map" >/dev/null 2>&1 || return 0
-  binding=( ${(z)"$(bindkey -M "$map" '^X^P')"} )
+  binding=( ${(z)"$(bindkey -M "$map" -L '^X^P')"} )
   kind=${(Q)binding[-1]}
+  (( ${binding[(Ie)-s]} )) && conflict=1
   [[ "$kind" == undefined-key || "$kind" == _th_python_check ]] || conflict=1
-  binding=( ${(z)"$(bindkey -M "$map" '^X')"} )
+  binding=( ${(z)"$(bindkey -M "$map" -L '^X')"} )
+  (( ${binding[(Ie)-s]} )) && conflict=1
   [[ "${(Q)binding[-1]}" == undefined-key ]] || conflict=1
   for entry in "${(@f)$(bindkey -M "$map" -L)}"; do
     fields=( ${(z)entry} )

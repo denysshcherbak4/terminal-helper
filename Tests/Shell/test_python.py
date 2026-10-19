@@ -176,6 +176,24 @@ class PythonFixture(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(self.inspect(text)[0], 'unsupported')
 
+    def test_target_abbreviations_and_short_clusters_leave_text_and_cursor(self):
+        for text in ('pip install --tar=/tmp pandas', 'pip install --prefi=/tmp pandas',
+                     'pip install --pref /tmp pandas', 'pip install -Ut/tmp pandas',
+                     'pip install -qt /tmp pandas', 'pip install "--tar=/tmp" pandas',
+                     "pip install '-Ut/tmp' pandas"):
+            with self.subTest(text=text):
+                cursor = len(text) - 3
+                self.assertNotIn('Proposed:', self.request(text, cursor))
+                out = self.shell.buffer()
+                self.assertIn(':' + str(cursor), out)
+                self.assertNotIn('.venv/bin/python', out)
+                # Buffer dump uses zsh quoting; compare exact raw buffer natively.
+                self.shell.send('\x19')
+                self.assertIn('PY_STATUS:unsupported', self.shell.wait_for('PY_DONE\r\n'))
+                self.assertFalse(self.sentinel.exists())
+        for text in ('pip install -U pandas', 'pip install --upgrade pandas'):
+            self.assertEqual(self.inspect(text)[0], 'suggestion')
+
     def test_remote_and_runtime_overrides_decline_without_values(self):
         for name in ('SSH_CONNECTION', 'DEVCONTAINER', 'PIP_TARGET', 'PIP_PREFIX', 'PIP_ROOT', 'PIP_USER', 'PIP_CONFIG_FILE', 'PYTHONHOME', 'PYTHONPATH'):
             self.command(name + '=DO_NOT_DISPLAY_OVERRIDE_VALUE')
@@ -305,6 +323,19 @@ class PythonFixture(unittest.TestCase):
         out = self.command("bindkey -M emacs '^X^P'")
         self.assertIn('undefined-key', out)
         self.assertIn('py_other', self.command("bindkey -M emacs '^X^Pz'"))
+
+    def test_macro_payload_cannot_impersonate_widget_ownership(self):
+        for key in ('^X^P', '^X'):
+            for payload in ('undefined-key', '_th_python_check'):
+                with self.subTest(key=key, payload=payload):
+                    self.command("bindkey -M emacs '^X' undefined-key; bindkey -M emacs '^X^P' undefined-key; bindkey -M emacs -s " + shlex.quote(key) + ' ' + shlex.quote(payload))
+                    before = self.command("bindkey -M emacs -L " + shlex.quote(key))
+                    self.command('_th_python_register_shortcut')
+                    after = self.command("bindkey -M emacs -L " + shlex.quote(key))
+                    self.assertIn('-s', before)
+                    self.assertIn('-s', after)
+                    self.assertIn(payload, after)
+                    self.assertIn('binding/prefix conflict', self.command('_th_python_doctor'))
 
     def test_python3_and_pip3_simple_forms(self):
         for text in ('pip3 install pandas', 'python -m pip install pandas', 'python3 -m pip install pandas'):
