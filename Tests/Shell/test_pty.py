@@ -173,6 +173,25 @@ class CompletionTests(unittest.TestCase):
         self.shell.send('\x15bindkey -M menuselect "^M"\r')
         self.assertIn('custom_menu_key', self.shell.read())
 
+
+    def test_native_menu_macro_is_restored_without_running_it(self):
+        self.shell.send("zmodload zsh/complist; bindkey -M menuselect -s '^M' 'MACRO_LITERAL \"quoted\" $(touch MENU_MACRO_RAN)'; bindkey -M menuselect -L '^M'\n")
+        before = self.shell.read()
+        original = next(line for line in before.splitlines() if line.startswith('bindkey -M menuselect -s '))
+        for name in ['ChoiceOne', 'ChoiceTwo']:
+            (self.home / name).mkdir()
+        for ending, disable in [('\r', False), ('\x1b', False), ('\r', True)]:
+            self.state(True)
+            self.complete('cd Cho')
+            if disable:
+                self.state(False)
+            self.shell.send(ending)
+            self.shell.read(0.5)
+            self.shell.send("\x15bindkey -M menuselect -L '^M'\r")
+            after = self.shell.read()
+            self.assertIn(original, after)
+            self.assertFalse((self.home / 'MENU_MACRO_RAN').exists())
+
     def test_typo(self):
         self.complete('cd ' + str(self.home) + '/dents')
         self.shell.send('\r')
