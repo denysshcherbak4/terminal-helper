@@ -18,4 +18,4 @@ The native `--termination-self-test` and `--update-cancel-self-test` exercise ex
 
 For bugs, give the commit/app version, macOS/zsh/terminal versions and a synthetic reproduction. Never paste real command history, secrets, private paths or environment dumps. Report security problems through the private route in SECURITY.md.
 
-No public release, new privileged service, paid dependency, telemetry or architecture expansion is implied by a patch. History suggestions, extra shells and language introspection remain deferred. Contributions are offered under the repository's MIT license.
+No public release, new privileged service, paid dependency, telemetry or architecture expansion is implied by a patch. History suggestions, extra shells and language introspection remain deferred. Contributions are offered under GNU GPL version 3 only (GPL-3.0-only), as specified in LICENSE. Submit only material you can license compatibly; preserve required third-party notices. Previously published releases through v0.3.1 retain their original MIT terms (see NOTICE).

@@ -16,7 +16,7 @@ xcrun swiftc -O App/Icon.swift Scripts/GenerateIcon.swift -o build/generate-icon
 build/generate-icon build/AppIcon.iconset
 xcrun iconutil -c icns build/AppIcon.iconset -o "$app/Contents/Resources/AppIcon.icns"
 cp Integration/terminal-helper.zsh Integration/install.zsh Integration/uninstall.zsh "$app/Contents/Resources/Integration/"
-cp README.md LICENSE PRIVACY.md App/Help.txt "$app/Contents/Resources/Docs/"
+cp README.md LICENSE NOTICE PRIVACY.md App/Help.txt "$app/Contents/Resources/Docs/"
 if [[ -d Docs ]]; then cp -R Docs/. "$app/Contents/Resources/Docs/"; fi
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

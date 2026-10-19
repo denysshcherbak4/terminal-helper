@@ -120,4 +120,4 @@ bash Scripts/package.sh
 
 The controller fixture runs **after the app build** and opens an unquarantined CI-built copy through Launch Services. This verifies the quit/Off handoff, not a downloaded app's Gatekeeper approval. Standalone update tests require the shared sources shown above; notice-policy tests additionally include App/UpdateNotices.swift. Record results only from the final exact-source complete CI run.
 
-The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in Assets/ and App/Icon.swift. Licensed under [MIT](LICENSE).
+The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in Assets/ and App/Icon.swift. Licensed under [GNU GPLv3 only](LICENSE) (GPL-3.0-only). Distributed derivatives must provide corresponding source under GPLv3; commercial use is allowed. Published releases through v0.3.1 remain MIT-licensed. See [licensing notices](NOTICE).

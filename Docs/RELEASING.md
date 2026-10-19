@@ -17,3 +17,24 @@ Automatic installation must not elevate or fall back to another destination. It 
 No paid Apple account is required to distribute this ad-hoc beta; it does not gain Developer ID trust or notarization. Explain [Apple's per-app approval](https://support.apple.com/102445); never globally disable Gatekeeper, strip quarantine or override malware/damaged-app warnings. Some users and managed Macs cannot run the beta.
 
 A future identified/notarized path needs securely configured signing material and separate validation. Current CI uses ad-hoc signing and consumes no signing secrets.
+
+## GPLv3 source and notices
+
+The current project is GPL-3.0-only; published versions through v0.3.1 remain
+MIT-licensed. Do not replace or relabel their assets. The next public binary
+must use a new version number and carry LICENSE and NOTICE in the app's
+Contents/Resources/Docs directory.
+
+For every GPL binary release, provide a complete Corresponding Source archive
+for the exact build commit next to the binary downloads on the same public
+release page, at no extra charge or account requirement. GitHub's generated
+source archives are suitable only when they contain every source file and
+build/install script needed for that exact artifact. Include any future
+submodules, generated source or other required material explicitly when
+necessary. Verify the public archive resolves to the tested commit and that
+the documented remote macOS build works from it. Identify that source link
+and GPL-3.0-only in the release notes. Do not use a different branch tip as
+the binary's source. Preserve third-party license notices.
+
+GPL permits commercial redistribution; its source-sharing obligations apply
+when conveying covered copies, not merely to private modifications.
