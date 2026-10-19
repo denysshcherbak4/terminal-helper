@@ -340,6 +340,21 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('Choice', out)
         self.assertIn('cd ', out)
 
+
+    def test_arrow_navigation_selects_exact_nonfirst_candidate(self):
+        names = ['Choice_%02d_long_directory_name_for_single_column' % i for i in range(1, 5)]
+        for name in names:
+            (self.home / name).mkdir()
+        self.shell.send('COLUMNS=60; LINES=24\n')
+        self.shell.read()
+        out = self.complete('cd Choice_')
+        self.assertRegex(out, r'\x1b\[[0-9;]*7m', 'Active candidate must be visibly reverse-highlighted')
+        self.shell.send('\x1b[B\x1b[B\x1b[A\r')
+        self.shell.read()
+        out = self.shell.buffer()
+        self.assertIn('DUMP:"cd ' + names[1] + '/":', out)
+        self.assertNotIn('DUMP:"cd ' + names[0] + '/":', out)
+
     def test_executable_completion(self):
         self.complete('pytho')
         self.shell.send('\r')
