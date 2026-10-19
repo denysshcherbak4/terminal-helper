@@ -125,6 +125,42 @@ class ManagementCommandTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('stub:1:--version', result.stdout)
 
+    def test_doctor_reports_live_shell_without_running_recorded_app(self):
+        plist = self.app / 'Contents/Info.plist'
+        plist.write_text('<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>0.3.3</string></dict></plist>')
+        result = self.shell('terminal-helper doctor')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Terminal Helper integration: 0.3.3', result.stdout)
+        self.assertIn('Shared state: Off', result.stdout)
+        self.assertIn('App version: 0.3.3 (recorded app metadata)', result.stdout)
+        self.assertIn('emacs Tab:', result.stdout)
+        self.assertIn('viins Tab:', result.stdout)
+        self.assertFalse((self.home / 'cli-calls').exists())
+
+    def test_doctor_handles_missing_malformed_state_and_app_marker(self):
+        for value in ('bad', 'terminal-helper-v1:on\nextra'):
+            (self.base / 'state').write_text(value)
+            self.write_marker('/bad\nmetadata.app\n')
+            result = self.shell('terminal-helper doctor')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('invalid or missing (helper disabled)', result.stdout)
+            self.assertIn('App version: unavailable', result.stdout)
+        self.assertFalse((self.home / 'cli-calls').exists())
+
+    def test_doctor_survives_unsafe_accept_macro_and_hides_payload(self):
+        result = self.shell('terminal-helper doctor',
+                            "bindkey -M emacs -s '^M' 'PRIVATE_MACRO_CONTENT'")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('not installed:', result.stdout)
+        self.assertNotIn('PRIVATE_MACRO_CONTENT', result.stdout)
+
+    def test_doctor_reports_later_plugin_conflict_and_preserves_accept_line(self):
+        result = self.shell("bindkey -M emacs '^I' complete-word; terminal-helper doctor; zle -l -L accept-line")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('conflict: a later binding owns Tab', result.stdout)
+        self.assertNotIn('zle -N accept-line _th_accept', result.stdout)
+
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class Shell:
-    def __init__(self, home, integrated=True, custom_enter=False, enter_macro=False, initialize_completion=True):
+    def __init__(self, home, integrated=True, custom_enter=False, enter_macro=False, initialize_completion=True, before_source=""):
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             env = {**os.environ, 'HOME': str(home), 'ZDOTDIR': str(home),
@@ -38,6 +38,9 @@ class Shell:
         if enter_macro:
             self.send("bindkey -s '^M' 'MACRO_LITERAL'\n")
             self.read()
+        if before_source:
+            self.send(before_source + "; print -r -- TH'_'CUSTOMIZED\\n")
+            self.wait_for('TH_CUSTOMIZED\\r\\n')
         if integrated:
             self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + "; print -r -- TH'_'SOURCED\n")
             self.wait_for('TH_SOURCED\r\n')
@@ -203,10 +206,13 @@ class CompletionTests(unittest.TestCase):
         time.sleep(0.15)
         self.assertIn('cd ~/Doc', self.shell.buffer())
 
-    def test_off_does_not_complete(self):
+    def test_off_preserves_native_completion_without_helper_correction(self):
         self.state(False)
         self.complete('cd ~/Doc')
-        self.assertIn('cd ~/Doc', self.shell.buffer())
+        self.assertIn('Documents', self.shell.buffer())
+        self.shell.send('\\x15')
+        self.complete('cd dents')
+        self.assertIn('DUMP:"cd dents":8', self.shell.buffer())
 
     def test_pending_disable(self):
         self.complete('cd ~/Doc')
@@ -215,13 +221,19 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('cd ~/Doc', self.shell.buffer())
 
     def test_reenable(self):
-        self.state(False)
-        self.complete('cd ~/Doc')
-        self.state(True)
-        self.shell.send('\t\r')
-        self.assertIn('Documents', self.shell.buffer())
+        for enabled in (False, True, False, True):
+            self.state(enabled)
+            self.shell.send('\x15')
+            self.complete('cd dents')
+            if enabled:
+                self.shell.send('\r')
+                self.assertIn('denys', self.shell.buffer())
+            else:
+                self.assertIn('DUMP:"cd dents":8', self.shell.buffer())
 
     def test_unsupported_command_is_not_evaluated(self):
+        self.shell.close()
+        self.shell = Shell(self.home, before_source="function safe_fallback() { zle -M ORIGINAL_TAB; }; zle -N safe_fallback; bindkey '^I' safe_fallback")
         sentinel = self.home / 'EXECUTED'
         text = 'echo $(touch ' + str(sentinel) + ')'
         self.complete(text)
@@ -229,6 +241,8 @@ class CompletionTests(unittest.TestCase):
         self.assertFalse(sentinel.exists())
 
     def test_bracketed_paste_multiline_is_inert_and_unchanged(self):
+        self.shell.close()
+        self.shell = Shell(self.home, before_source="function safe_fallback() { zle -M ORIGINAL_TAB; }; zle -N safe_fallback; bindkey '^I' safe_fallback")
         sentinel = self.home / 'PASTE_MUST_NOT_EXECUTE'
         text = 'touch ' + str(sentinel) + '\nprint PASTED_SECOND'
         self.shell.send('\x1b[200~' + text + '\x1b[201~\t')
@@ -239,6 +253,8 @@ class CompletionTests(unittest.TestCase):
         self.assertFalse(sentinel.exists())
 
     def test_multiline_unsupported(self):
+        self.shell.close()
+        self.shell = Shell(self.home, before_source="function safe_fallback() { zle -M ORIGINAL_TAB; }; zle -N safe_fallback; bindkey '^I' safe_fallback")
         self.shell.send("function multiline_buffer() { BUFFER=$'echo first\\necho second'; CURSOR=${#BUFFER}; }; zle -N multiline_buffer; bindkey '^Y' multiline_buffer\n")
         self.shell.read()
         self.shell.send('\x19\t')
@@ -270,8 +286,8 @@ class CompletionTests(unittest.TestCase):
                 target.write_text(value)
                 target.chmod(0o600)
             self.shell.send('\x15')
-            self.complete('cd ~/Doc')
-            self.assertIn('cd ~/Doc', self.shell.buffer())
+            self.complete('cd dents')
+            self.assertIn('cd dents', self.shell.buffer())
 
     def test_normal_enter_unchanged(self):
         self.shell.send('print NORMAL_ENTER\r')
@@ -457,28 +473,89 @@ class CompletionTests(unittest.TestCase):
         try:
             self.state(False)
             for shell in (self.shell, second):
-                shell.send('cd ~/Doc\t')
+                shell.send('cd dents\t')
                 shell.read()
-                self.assertIn('cd ~/Doc', shell.buffer())
+                self.assertIn('cd dents', shell.buffer())
         finally:
             second.close()
 
     def test_state_permissions_and_symlink_rejected(self):
         target = self.base / 'state'
         target.chmod(0o644)
-        self.complete('cd ~/Doc')
-        self.assertIn('cd ~/Doc', self.shell.buffer())
+        self.complete('cd dents')
+        self.assertIn('cd dents', self.shell.buffer())
         self.shell.send('\x15')
         target.unlink()
         elsewhere = self.home / 'elsewhere'
         elsewhere.write_text('terminal-helper-v1:on\n')
         elsewhere.chmod(0o600)
         target.symlink_to(elsewhere)
-        self.complete('cd ~/Doc')
-        self.assertIn('cd ~/Doc', self.shell.buffer())
+        self.complete('cd dents')
+        self.assertIn('cd dents', self.shell.buffer())
+
+    def test_off_native_completion_matches_unintegrated_baseline(self):
+        self.state(False)
+        baseline = Shell(self.home, integrated=False)
+        try:
+            for shell in (baseline, self.shell):
+                shell.send('cat ~/Doc\t')
+                shell.read(0.8)
+            def dump(shell):
+                return next(line for line in shell.buffer().splitlines() if line.startswith('DUMP:'))
+            self.assertEqual(dump(self.shell), dump(baseline))
+        finally:
+            baseline.close()
+
+    def test_custom_tab_widget_is_delegated_for_off_and_unsupported_syntax(self):
+        self.shell.close()
+        setup = "function saved_tab() { LBUFFER+='ORIGINAL_TAB'; }; zle -N saved_tab; bindkey -M emacs '^I' saved_tab"
+        self.shell = Shell(self.home, before_source=setup)
+        for text, enabled in [('plain', False), ('echo $HOME/', True)]:
+            self.state(enabled)
+            self.shell.send('\x15' + text + '\t')
+            self.shell.read()
+            self.assertIn('DUMP:"' + text + 'ORIGINAL_TAB":', self.shell.buffer())
+
+    def test_tab_macro_is_not_wrapped_and_doctor_does_not_expose_payload(self):
+        self.shell.close()
+        self.shell = Shell(self.home, before_source="bindkey -M emacs -s '^I' 'SECRET_MACRO_PAYLOAD'")
+        self.shell.send('prefix\t')
+        self.shell.read()
+        self.assertIn('prefixSECRET_MACRO_PAYLOAD', self.shell.buffer())
+        self.shell.send('\x15terminal-helper doctor\r')
+        out = self.shell.read()
+        self.assertIn('emacs Tab:', out)
+        self.assertIn('macro', out)
+        self.assertNotIn('SECRET_MACRO_PAYLOAD', out)
+
+    def test_emacs_viins_and_main_alias_switch_after_source(self):
+        for option, map_name in [('-v', 'viins'), ('-e', 'emacs')]:
+            self.shell.send('\x15bindkey ' + option + "; bindkey -M viins '^]' dump_buffer\r")
+            self.shell.read()
+            self.state(True)
+            self.complete('cd dents')
+            self.shell.send('\r')
+            self.assertIn('denys', self.shell.buffer())
+            self.shell.send('\x15')
+            self.state(False)
+            self.complete('cat ~/Doc')
+            self.assertIn('Documents', self.shell.buffer())
+            self.shell.send('\x15')
+            self.state(True)
+
+    def test_later_plugin_tab_and_repeat_source_are_preserved(self):
+        source = str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ')
+        self.shell.send("function later_tab() { LBUFFER+='LATER_PLUGIN'; }; zle -N later_tab; bindkey -M emacs '^I' later_tab; source " + source + "\r")
+        self.shell.read()
+        self.shell.send('prefix\t')
+        self.shell.read()
+        self.assertIn('prefixLATER_PLUGIN', self.shell.buffer())
+        self.shell.send('\x15terminal-helper doctor\r')
+        self.assertIn('conflict: a later binding owns Tab', self.shell.read())
 
 
-def benchmark(repetitions=30, initialize_completion=True):
+
+def benchmark(repetitions=30, initialize_completion=True, integrated=True):
     """Measure actual useful insertion in a PTY, excluding fixture/shell setup."""
     with tempfile.TemporaryDirectory() as tmp:
         home = Path(tmp)
@@ -490,7 +567,7 @@ def benchmark(repetitions=30, initialize_completion=True):
         for index in range(255):
             (home / ('dataset_%03d.csv' % index)).touch()
         (home / 'perf-target-final.csv').touch()
-        shell = Shell(home, initialize_completion=initialize_completion)
+        shell = Shell(home, integrated=integrated, initialize_completion=initialize_completion)
         shell.send('cd ' + str(home) + '\n')
         shell.read()
         results = []
@@ -498,7 +575,7 @@ def benchmark(repetitions=30, initialize_completion=True):
             for iteration in range(repetitions):
                 if iteration and not initialize_completion:
                     shell.close()
-                    shell = Shell(home, initialize_completion=False)
+                    shell = Shell(home, integrated=integrated, initialize_completion=False)
                     shell.send('cd ' + str(home) + '\n')
                     shell.read()
                 shell.send('\x15cat perf-target-fina')
@@ -515,27 +592,31 @@ def benchmark(repetitions=30, initialize_completion=True):
                     if ready:
                         data += os.read(shell.fd, 65536)
                 results.append((time.perf_counter() - start) * 1000)
-                shell.send('\r\x15')
+                shell.send('\x15')
                 shell.read(0.03)
         finally:
             shell.close()
         if not initialize_completion:
             ordered = sorted(results)
             return {'method': 'Fresh PTY shell without compinit: Tab through initialization to visible filename insertion; OS caches not flushed',
-                    'fixture_entries': 256, 'repetitions': repetitions,
+                    'integrated': integrated, 'fixture_entries': 256, 'repetitions': repetitions,
                     'first_observation_ms': results[0],
                     'fresh_shell_p95_ms': ordered[min(len(ordered)-1, int(len(ordered)*.95))],
                     'all_ms': results}
         ordered = sorted(results[1:])
         return {'method': 'PTY Tab to visible unique filename insertion',
-                'fixture_entries': 256, 'repetitions': repetitions,
+                'integrated': integrated, 'fixture_entries': 256, 'repetitions': repetitions,
                 'first_ms': results[0], 'warm_p95_ms': ordered[min(len(ordered)-1, int(len(ordered)*.95))],
                 'all_ms': results}
 
 
 if __name__ == '__main__':
     import sys
-    if '--benchmark-uninitialized' in sys.argv:
+    if '--benchmark-uninitialized-baseline' in sys.argv:
+        print(json.dumps(benchmark(initialize_completion=False, integrated=False), indent=2))
+    elif '--benchmark-baseline' in sys.argv:
+        print(json.dumps(benchmark(integrated=False), indent=2))
+    elif '--benchmark-uninitialized' in sys.argv:
         print(json.dumps(benchmark(initialize_completion=False), indent=2))
     elif '--benchmark' in sys.argv:
         print(json.dumps(benchmark(), indent=2))
