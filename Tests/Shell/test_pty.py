@@ -39,8 +39,8 @@ class Shell:
             self.send("bindkey -s '^M' 'MACRO_LITERAL'\n")
             self.read()
         if before_source:
-            self.send(before_source + "; print -r -- TH'_'CUSTOMIZED\\n")
-            self.wait_for('TH_CUSTOMIZED\\r\\n')
+            self.send(before_source + "; print -r -- TH'_'CUSTOMIZED\n")
+            self.wait_for('TH_CUSTOMIZED\r\n')
         if integrated:
             self.send('source ' + str(ROOT / 'Integration/terminal-helper.zsh').replace(' ', '\\ ') + "; print -r -- TH'_'SOURCED\n")
             self.wait_for('TH_SOURCED\r\n')
@@ -210,7 +210,7 @@ class CompletionTests(unittest.TestCase):
         self.state(False)
         self.complete('cd ~/Doc')
         self.assertIn('Documents', self.shell.buffer())
-        self.shell.send('\\x15')
+        self.shell.send('\x15')
         self.complete('cd dents')
         self.assertIn('DUMP:"cd dents":8', self.shell.buffer())
 

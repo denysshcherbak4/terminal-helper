@@ -155,10 +155,10 @@ class ManagementCommandTests(unittest.TestCase):
         self.assertNotIn('PRIVATE_MACRO_CONTENT', result.stdout)
 
     def test_doctor_reports_later_plugin_conflict_and_preserves_accept_line(self):
-        result = self.shell("bindkey -M emacs '^I' complete-word; terminal-helper doctor; zle -l -L accept-line")
+        result = self.shell("bindkey -M emacs '^I' complete-word; terminal-helper doctor; print -r -- ACCEPT_WIDGET:$widgets[accept-line]")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('conflict: a later binding owns Tab', result.stdout)
-        self.assertNotIn('zle -N accept-line _th_accept', result.stdout)
+        self.assertIn('ACCEPT_WIDGET:builtin', result.stdout)
 
 
 

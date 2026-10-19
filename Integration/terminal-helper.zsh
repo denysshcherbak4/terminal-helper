@@ -72,7 +72,7 @@ _th_binding_widget() {
 
 _th_doctor() {
   local base="$HOME/Library/Application Support/Terminal Helper" state_status='invalid or missing (helper disabled)'
-  local app_status='unavailable; reinstall integration from the app' record app plist version map owner status shortcut REPLY
+  local app_status='unavailable; reinstall integration from the app' record app plist version map owner diag_status shortcut REPLY
   local -A info
   print -r -- "Terminal Helper integration: $_TH_INTEGRATION_VERSION"
   zmodload zsh/stat zsh/mapfile || { print -r -- 'Shell modules unavailable; restart zsh.'; return 1; }
@@ -80,7 +80,7 @@ _th_doctor() {
      zstat -H info -- "$base" 2>/dev/null && (( (info[mode] & 8#7777) == 8#700 )); then
     if [[ -f "$base/state" && ! -L "$base/state" && -O "$base/state" ]] &&
        zstat -H info -- "$base/state" 2>/dev/null &&
-       (( (info[mode] & 8#7777) == 8#600 && info[size] == 22 )); then
+       (( (info[mode] & 8#7777) == 8#600 && (info[size] == 22 || info[size] == 23) )); then
       case "$mapfile[$base/state]" in
         $'terminal-helper-v1:on\n') state_status=On ;;
         $'terminal-helper-v1:off\n') state_status=Off ;;
@@ -114,11 +114,11 @@ _th_doctor() {
   fi
   for map in emacs viins; do
     if _th_binding_widget "$map" '^I'; then owner=$REPLY; else owner=$REPLY; fi
-    status=${_TH_MAP_STATUS[$map]:-not installed}
-    if [[ "$status" == integrated && "$owner" != "_th_tab_$map" ]]; then
-      status='conflict: a later binding owns Tab; left untouched'
+    diag_status=${_TH_MAP_STATUS[$map]:-not installed}
+    if [[ "$diag_status" == integrated && "$owner" != "_th_tab_$map" ]]; then
+      diag_status='conflict: a later binding owns Tab; left untouched'
     fi
-    print -r -- "$map Tab: ${(qqqq)owner}; $status"
+    print -r -- "$map Tab: ${(qqqq)owner}; $diag_status"
     if _th_binding_widget "$map" '^X^P'; then
       shortcut=${(qqqq)REPLY}
       [[ "$REPLY" == _th_python_* ]] || shortcut="$shortcut (existing binding; left untouched)"
