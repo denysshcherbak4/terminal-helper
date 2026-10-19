@@ -199,7 +199,7 @@ _th_tab() {
     _th_restore_menu
     # Native expansion widgets can execute command substitutions on Tab.
     # Decline unsupported input while On instead of introducing that side effect.
-    case "${_TH_TAB_NAMES[$map]}" in
+    case "${_TH_TAB_NAMES[$map]#.}" in
       expand-or-complete|expand-or-complete-prefix|menu-expand-or-complete|expand-word|list-expand)
         zle -M 'Terminal Helper: unsupported input; expanding Tab action declined'
         return 0 ;;

@@ -539,6 +539,17 @@ class CompletionTests(unittest.TestCase):
             self.assertIn('DUMP:"' + quoted + '":' + str(len(text)), out)
             self.assertFalse(sentinel.exists())
 
+    def test_dotted_native_expansion_widget_is_also_declined(self):
+        self.shell.close()
+        self.shell = Shell(self.home, initialize_completion=False,
+                           before_source="bindkey '^I' .expand-or-complete")
+        sentinel = self.home / 'DOTTED_NATIVE_MUST_NOT_EXECUTE'
+        text = 'echo $(touch ' + str(sentinel) + ')'
+        self.complete(text)
+        self.assertFalse(sentinel.exists())
+        self.assertIn('DUMP:"' + text.replace('$', '\\$') + '":' + str(len(text)),
+                      self.shell.buffer())
+
     def test_fresh_shell_off_retains_original_expansion_behavior(self):
         self.state(False)
         self.shell.close()
