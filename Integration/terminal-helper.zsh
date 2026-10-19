@@ -134,6 +134,7 @@ _th_doctor() {
     print -r -- "$map Ctrl-X Ctrl-P: $shortcut"
   done
   print -r -- 'Off delegates your original Tab; it disables Terminal Helper corrections.'
+  print -r -- 'While On, unsupported input declines native expansion widgets; custom widget behavior remains yours.'
   print -r -- 'To refresh bindings, open a new shell after loading completion plugins.'
   print -r -- 'To remove integration, use Settings > Remove Shell Integration, then open a new shell.'
 }
@@ -196,6 +197,13 @@ _th_tab() {
   if ! _th_supported; then
     _TH_ACTIVE=0 _TH_CANCELLED=0 _TH_PREVIEW_SET=0
     _th_restore_menu
+    # Native expansion widgets can execute command substitutions on Tab.
+    # Decline unsupported input while On instead of introducing that side effect.
+    case "${_TH_TAB_NAMES[$map]}" in
+      expand-or-complete|expand-or-complete-prefix|menu-expand-or-complete|expand-word|list-expand)
+        zle -M 'Terminal Helper: unsupported input; expanding Tab action declined'
+        return 0 ;;
+    esac
     zle "_th_original_tab_$map"
     return
   fi

@@ -523,6 +523,40 @@ class CompletionTests(unittest.TestCase):
         finally:
             baseline.close()
 
+    def test_fresh_shell_declines_command_substitution_while_on(self):
+        self.shell.close()
+        self.shell = Shell(self.home, initialize_completion=False)
+        self.shell.send("print -r -- SAVED_TAB:$_TH_TAB_NAMES[emacs]\r")
+        self.assertIn('SAVED_TAB:expand-or-complete\r\n', self.shell.read())
+        for label, expression in [('dollar', '$(touch MARKER)'), ('backtick', chr(96) + 'touch MARKER' + chr(96))]:
+            sentinel = self.home / ('MUST_NOT_EXECUTE_' + label)
+            text = 'echo ' + expression.replace('MARKER', str(sentinel))
+            self.shell.send('\x15' + text + '\t')
+            out = self.shell.read(0.8)
+            self.assertIn('expanding Tab action declined', out)
+            out = self.shell.buffer()
+            quoted = text.replace('$', '\\$').replace(chr(96), '\\' + chr(96))
+            self.assertIn('DUMP:"' + quoted + '":' + str(len(text)), out)
+            self.assertFalse(sentinel.exists())
+
+    def test_fresh_shell_off_retains_original_expansion_behavior(self):
+        self.state(False)
+        self.shell.close()
+        self.shell = Shell(self.home, initialize_completion=False)
+        baseline = Shell(self.home, integrated=False, initialize_completion=False)
+        try:
+            for label, expression in [('dollar', '$(touch MARKER)'), ('backtick', chr(96) + 'touch MARKER' + chr(96))]:
+                results = []
+                for index, shell in enumerate((baseline, self.shell)):
+                    sentinel = self.home / ('BASELINE_' + label + str(index))
+                    text = 'echo ' + expression.replace('MARKER', str(sentinel))
+                    shell.send('\x15' + text + '\t')
+                    shell.read(0.8)
+                    results.append(sentinel.exists())
+                self.assertEqual(results[0], results[1])
+        finally:
+            baseline.close()
+
     def test_custom_tab_widget_is_delegated_for_off_and_unsupported_syntax(self):
         self.shell.close()
         setup = "function saved_tab() { LBUFFER+='ORIGINAL_TAB'; }; zle -N saved_tab; bindkey -M emacs '^I' saved_tab"
