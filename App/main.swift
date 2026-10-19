@@ -379,10 +379,22 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             },
             {
                 check(self.noticeTestOffers.count == 3, "late response after uninstall Off transition is ignored")
+                self.changeEnabled()
+                let modal = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 120), styleMask: [.titled], backing: .buffered, defer: false)
+                modal.isReleasedWhenClosed = false
+                let session = NSApp.beginModalSession(for: modal)
+                _ = NSApp.runModalSession(session)
+                check(NSApp.modalWindow != nil, "actual AppKit modal session")
+                guard case .available(let offer) = try! TerminalUpdates.parse(data("999.0.3"), current: TerminalUpdates.currentVersion) else { check(false, "modal offer fixture"); return }
+                self.presentUpdateOffer(offer, automaticGeneration: self.automaticGeneration)
+                check(self.noticeTestOffers.count == 3, "automatic notice does not interrupt an existing modal task")
+                check(self.cachedOffer?.version == offer.version && self.offerMenuItem?.isHidden == false && self.offerMenuItem?.isEnabled == true, "deferred notice retains explicit version menu action")
+                NSApp.endModalSession(session); modal.close()
+                self.changeEnabled()
                 defaults.removePersistentDomain(forName: suite)
                 do { try FileManager.default.removeItem(at: root) }
                 catch { check(false, "private fixture cleanup") }
-                print("PASS native update notices: default preference, Off cancellation, late responses, daily retry, reminder, skip, higher release, manual override and uninstall Off cancellation (no network)")
+                print("PASS native update notices: default preference, Off cancellation, late responses, daily retry, reminder, skip, higher release, manual override, uninstall Off cancellation and modal deferral (no network)")
                 self.quitting = true; NSApp.terminate(nil)
             }
         ]
@@ -672,6 +684,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         cachedOffer = offer
         updateStatus = "Version " + offer.version + " is available."; refresh()
+        if generation != nil && NSApp.modalWindow != nil { return }
         let alert = NSAlert()
         alert.messageText = "Terminal Helper " + offer.version + " is available"
         alert.informativeText = "Update Now downloads and verifies this free ad-hoc beta. You will be asked before installation closes and replaces the app. macOS may require approval when reopening it."
