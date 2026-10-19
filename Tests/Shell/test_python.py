@@ -177,17 +177,22 @@ class PythonFixture(unittest.TestCase):
                 self.assertEqual(self.inspect(text)[0], 'unsupported')
 
     def test_target_abbreviations_and_short_clusters_leave_text_and_cursor(self):
+        self.command('function py_same_buffer() { [[ "$BUFFER" == "$PY_EXPECTED" ]] && print -r -- PY_EXACT_MATCH; print -r -- PY_EXPECTED_CURSOR:$CURSOR; print -r -- PY_COMPARE_DONE; }; zle -N py_same_buffer; bindkey "^W" py_same_buffer')
         for text in ('pip install --tar=/tmp pandas', 'pip install --prefi=/tmp pandas',
                      'pip install --pref /tmp pandas', 'pip install -Ut/tmp pandas',
                      'pip install -qt /tmp pandas', 'pip install "--tar=/tmp" pandas',
                      "pip install '-Ut/tmp' pandas"):
             with self.subTest(text=text):
+                self.command('typeset -g PY_EXPECTED=' + shlex.quote(text))
                 cursor = len(text) - 3
                 self.assertNotIn('Proposed:', self.request(text, cursor))
                 out = self.shell.buffer()
                 self.assertIn(':' + str(cursor), out)
                 self.assertNotIn('.venv/bin/python', out)
-                # Buffer dump uses zsh quoting; compare exact raw buffer natively.
+                self.shell.send('\x17')
+                exact = self.shell.wait_for('PY_COMPARE_DONE\r\n')
+                self.assertIn('PY_EXACT_MATCH\r\n', exact)
+                self.assertIn('PY_EXPECTED_CURSOR:' + str(cursor) + '\r\n', exact)
                 self.shell.send('\x19')
                 self.assertIn('PY_STATUS:unsupported', self.shell.wait_for('PY_DONE\r\n'))
                 self.assertFalse(self.sentinel.exists())
