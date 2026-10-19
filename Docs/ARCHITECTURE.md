@@ -20,7 +20,7 @@ Off prevents Terminal Helper from generating candidates or scanning directories.
 
 Use ZLE and zsh completion infrastructure rather than evaluating a typed command or building a shell parser. Completion edits the buffer; it never executes the accepted command. Ordinary command execution is a separate user action. Existing valid paths must not be replaced by fuzzy alternatives. Exact/prefix results precede corrections, with clear labels.
 
-Custom correction retains conservative syntax checks. Unsupported input delegates to the captured supported completion widget; any resulting editing is the original shell/plugin behavior, not helper correction. The helper does not evaluate the buffer. Filenames and descriptions are untrusted terminal content. Test spaces, quotes, Unicode, controls, symlinks, relative paths, tilde, and edits away from the end of the buffer.
+Custom correction retains conservative syntax checks. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed. The helper does not evaluate the buffer. Filenames and descriptions are untrusted terminal content. Test spaces, quotes, Unicode, controls, symlinks, relative paths, tilde, and edits away from the end of the buffer.
 
 Native shell completion does not know Python/Jupyter runtime objects. CSV, Parquet, and notebook suggestions are ordinary files.
 
@@ -52,9 +52,6 @@ The request reuses bounded public-release metadata validation. Off cancels it, a
 
 ## Binding fallback and doctor (development build)
 
-The integration captures supported widget bindings per emacs/viins map once and delegates Tab while Off or outside custom correction syntax. Unsafe macros stay untouched; later plugin bindings remain authoritative. Enable/disable changes shared state, not the wrapper stack. A native menu may remain until it closes, with state rechecked before accepting helper text. No polling or per-keystroke process is added.
+The integration captures supported widget bindings per emacs/viins map once. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed. Unsafe macros stay untouched; later plugin bindings remain authoritative. Enable/disable changes shared state, not the wrapper stack. A native menu may remain until it closes, with state rechecked before accepting helper text. No polling or per-keystroke process is added.
 
 terminal-helper doctor collects this shell's loaded integration, current keymap and binding ownership in-process, separately from the app's version metadata. It reports missing/unsafe state and conflicts with reversible next steps, never repairs automatically or emits private input/history/environment values.
-
-
-Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

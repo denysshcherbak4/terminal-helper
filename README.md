@@ -63,7 +63,7 @@ Terminal Helper is a native menu-bar app for interactive zsh. Terminal.app is th
 - Show reliable descriptions supplied by configured completion definitions.
 - Complete CSV, Parquet and notebook filenames as ordinary files; it does not inspect Python/Jupyter objects.
 
-Acceptance edits the buffer without executing it. Unsupported expressions retain input. Corrections do not recurse, decline above 256 sibling entries, and offer at most 20 results. Native/third-party completion can still be expensive on large or remote directories.
+Acceptance edits the buffer without executing it. Unsupported custom correction preserves input; delegated user widgets can perform their original edits. Corrections do not recurse, decline above 256 sibling entries, and offer at most 20 results. Native/third-party completion can still be expensive on large or remote directories.
 
 ## One switch
 
@@ -126,7 +126,4 @@ The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in
 
 ## Diagnose this shell (development preview)
 
-Run terminal-helper doctor in the affected interactive zsh. It distinguishes app metadata from the integration loaded in that shell, shared state and live Tab ownership/conflicts. It never repairs configuration or prints history, command buffers, macro payloads or environment values. Restart shells after integration upgrades; later plugin bindings remain authoritative. Unsupported custom-correction syntax delegates to the original supported completion widget, whose existing third-party code retains its own trust boundary.
-
-
-Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.
+Run terminal-helper doctor in the affected interactive zsh. It distinguishes app metadata from the integration loaded in that shell, shared state and live Tab ownership/conflicts. It never repairs configuration or prints history, command buffers, macro payloads or environment values. Restart shells after integration upgrades; later plugin bindings remain authoritative. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed.

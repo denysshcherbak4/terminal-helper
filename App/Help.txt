@@ -17,7 +17,7 @@ GET STARTED
 USING SUGGESTIONS
 Press Tab to request a compact completion list. The current choice is reverse-highlighted. Use arrow keys to move through the list (including rows beyond the visible area), Enter to insert the selected text, or Escape to cancel. Accepting edits the command line only. Press Enter again after the list closes to execute deliberately.
 
-Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects. Unsupported syntax falls back to your original supported completion binding; its existing completion code retains its own trust boundary.
+Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed.
 
 OFF AND QUIT
 Turn off Enable suggestions to stop Terminal Helper assistance and cancel a pending automatic update metadata request. Tab then delegates to the original supported shell binding; ordinary completion and third-party plugins can still do their own work. Unsafe key macros are left untouched. Open shells check state at Tab and before accepting a pending suggestion; an existing native menu may remain visible until it closes. The idle menu-bar app stays resident while Off.
@@ -64,6 +64,3 @@ The free beta targets macOS 13 or later on Apple silicon and Intel. Automated ma
 
 DIAGNOSTICS
 Run terminal-helper doctor in the affected interactive shell. It reports app metadata separately from this shell's loaded integration, shared state and current keybinding ownership. It does not repair configuration, collect history or print environment values. If a later plugin replaced Tab, keep that binding or adjust plugin loading order deliberately; restart shells after integration updates.
-
-
-Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

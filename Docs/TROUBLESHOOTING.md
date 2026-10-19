@@ -6,7 +6,7 @@
 
 **The first Tab is slower.** An unconfigured shell initializes secure zsh completion on first use. Large/remote directories and existing third-party completion functions can take longer. Fuzzy correction only covers a missing final component in a small directory.
 
-**My syntax or keybindings are unusual.** The development build keeps custom correction conservative and delegates unsupported syntax to the original supported widget. That original completion may edit input according to your shell configuration. Key macros that cannot be delegated safely stay untouched, and later plugin bindings are never reclaimed automatically. Run terminal-helper doctor in that shell to inspect ownership; adjust plugin loading order only deliberately, or keep the plugin binding.
+**My syntax or keybindings are unusual.** The development build keeps custom correction conservative. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed. Key macros that cannot be delegated safely stay untouched, and later plugin bindings are never reclaimed automatically. Run terminal-helper doctor in that shell to inspect ownership; adjust plugin loading order only deliberately, or keep the plugin binding.
 
 **Installation or removal is refused.** The scripts reject unsafe symlinks and incomplete/edited managed blocks. Inspect the clearly marked block and the .zshrc.terminal-helper-backup files beside your configuration. Preserve your current file, compare the backup, and rerun the installer to repair a missing owned integration file. Do not replace the whole configuration just to install the app.
 
@@ -48,6 +48,3 @@
 
 
 **Doctor reports different versions.** App metadata and the integration already loaded in an open shell are separate facts. Restart that shell after installing/upgrading integration; running a new app cannot replace live widgets inside another process. Doctor only explains problems and never repairs files.
-
-
-Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.

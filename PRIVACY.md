@@ -4,7 +4,7 @@ Terminal Helper has no accounts, telemetry, analytics, crash uploads or cloud AI
 
 ## Local suggestions and settings
 
-Terminal Helper completion examines context and nearby entries locally when enabled and requested. It does not index the disk. In this development build, Off and unsupported syntax delegate to the original supported Tab widget; that ordinary completion or third-party plugin may independently scan files or use networking. It remains within its existing trust boundary and is not Terminal Helper assistance. Key macros that cannot be safely delegated stay untouched.
+Terminal Helper completion examines context and nearby entries locally when enabled and requested. It does not index the disk. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed. Ordinary completion or third-party plugins may independently scan files or use networking. It remains within its existing trust boundary and is not Terminal Helper assistance. Key macros that cannot be safely delegated stay untouched.
 
 Private On/Off state and integration live under ~/Library/Application Support/Terminal Helper. The non-executable mode-0600 app-path record stores the app bundle's absolute location for explicit terminal management commands; it is never evaluated as shell code or transmitted. A transient owned lock serializes installation/removal.
 
@@ -37,6 +37,3 @@ GitHub hosting/downloads, Apple operating-system security checks and optional re
 ## Explicit shell diagnostics (development build)
 
 terminal-helper doctor runs in the shell where you invoke it. It reads bounded owned state/app metadata and current keybinding ownership to distinguish installation from a loaded integration. It does not repair configuration, inspect history, print command buffers or macro payloads, or dump environment values. App metadata cannot prove which code an already-open shell loaded. No diagnostic information is uploaded.
-
-
-Unsupported-input safety: while On, known native expansion widgets (including their dot-prefixed builtins) are declined rather than invoked on unsupported syntax, because they can execute shell substitutions before completion. The input stays unchanged and the shell explains the limitation. Other captured completion widgets retain their existing user-configured trust boundary. Off deliberately preserves original Tab behavior, including any expansion behavior it already had.
