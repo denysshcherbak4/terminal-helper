@@ -1,12 +1,12 @@
 # Troubleshooting
 
-**There are no suggestions.** Open the menu-bar icon, enable suggestions, install integration in Settings, select the folder containing your .zshrc, and open a new interactive zsh. Tab is intentionally inert while Terminal Helper is Off. Installation status means the file is installed; it cannot prove an already-open shell sourced it.
+**There are no suggestions.** Open the menu-bar icon, enable suggestions, install integration in Settings, select the folder containing your .zshrc, and open a new interactive zsh. In the development build, Off delegates the original supported Tab binding instead of generating helper suggestions. The published 0.3.2 version still has inert Tab while Off. Installation status means the file is installed; it cannot prove an already-open shell sourced it.
 
 **My configuration uses ZDOTDIR.** Select that folder in the Settings picker. Select the same folder to uninstall. A Finder-launched app does not assume your shell environment. Do not overwrite or move your entire .zshrc.
 
 **The first Tab is slower.** An unconfigured shell initializes secure zsh completion on first use. Large/remote directories and existing third-party completion functions can take longer. Fuzzy correction only covers a missing final component in a small directory.
 
-**My syntax or keybindings are unusual.** Expressions, multiline input, key macros, and ambiguous syntax may be refused safely. Keep the input and use your existing shell workflow. Terminal Helper owns Tab while installed; uninstall and restart shells to restore the original startup configuration.
+**My syntax or keybindings are unusual.** The development build keeps custom correction conservative and delegates unsupported syntax to the original supported widget. That original completion may edit input according to your shell configuration. Key macros that cannot be delegated safely stay untouched, and later plugin bindings are never reclaimed automatically. Run terminal-helper doctor in that shell to inspect ownership; adjust plugin loading order only deliberately, or keep the plugin binding.
 
 **Installation or removal is refused.** The scripts reject unsafe symlinks and incomplete/edited managed blocks. Inspect the clearly marked block and the .zshrc.terminal-helper-backup files beside your configuration. Preserve your current file, compare the backup, and rerun the installer to repair a missing owned integration file. Do not replace the whole configuration just to install the app.
 
@@ -45,3 +45,6 @@
 
 
 **Tab lists matches but arrows do not move a highlight.** Versions through 0.3.1 could start plain completion instead of native menu selection. The 0.3.2 fix starts zsh menu selection explicitly. Use terminal-helper update to install published 0.3.2, restart terminal windows and enable suggestions. A source commit or draft alone does not update an installed app. In a selectable list, arrows move the reverse-highlighted choice; Enter inserts it without executing.
+
+
+**Doctor reports different versions.** App metadata and the integration already loaded in an open shell are separate facts. Restart that shell after installing/upgrading integration; running a new app cannot replace live widgets inside another process. Doctor only explains problems and never repairs files.

@@ -12,7 +12,7 @@ The current published community beta and main branch are the reviewed scope. A p
 
 Security properties:
 - Completion must not evaluate or execute typed input. Accepting a suggestion edits text only; execution is a separate action.
-- Off gates generation and acceptance in already-open integrated shells. Missing, malformed, unsafe or unreadable state fails closed.
+- Off gates Terminal Helper generation and acceptance in already-open integrated shells. Missing, malformed, unsafe or unreadable state disables Terminal Helper; the original supported Tab widget can still perform its own ordinary completion. Unsupported correction syntax also delegates without helper evaluation. User-configured completion code retains its own trust boundary.
 - Private state and app-path metadata are non-executable data, updated atomically. No polling or daemon. Suggestions have no network dependency. In 0.3.1, automatic catalog requests require suggestions On, the enabled automatic-check preference and an eligible launch/enable event; explicit update actions can contact GitHub while Off.
 - Install/uninstall must preserve unrelated shell configuration, use backups and atomic replacement, reject unsafe targets, serialize install/uninstall and refuse detected configuration changes, and remove only owned content.
 - Bundled installer processes run without elevated privileges in an owned process group. Quit disables assistance before terminating that group.
@@ -35,3 +35,7 @@ Automatic notices must not fetch checksums/DMGs or install anything. Update Now 
 ## Review limits
 
 The independent review reads source through GitHub APIs. The formal Codex Security orchestrator requires a local Git checkout, which conflicts with this project's remote-only development boundary; it has not been run. Do not describe the manual source review as a formal scanner result or a security guarantee. Actual Terminal.app/iTerm2, VoiceOver, oldest-macOS and slow-filesystem checks remain explicit release gates.
+
+## Binding and diagnostic boundary (development build)
+
+Capture supported original widget bindings per keymap once. Off and unsupported custom-correction syntax delegate to that original widget without evaluating the buffer. Unsafe key macros must remain untouched. Never reclaim a later plugin binding automatically; repeated sourcing/toggles must not stack wrappers. Pending helper acceptance rechecks state, and native menu bindings must be restored. Doctor collects live facts in the invoking shell; an app subprocess must not pretend to know its parent shell widgets. Do not expose macro payloads, environment contents or command history.

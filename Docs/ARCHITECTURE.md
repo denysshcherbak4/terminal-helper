@@ -20,7 +20,7 @@ Off prevents Terminal Helper from generating candidates or scanning directories.
 
 Use ZLE and zsh completion infrastructure rather than evaluating a typed command or building a shell parser. Completion edits the buffer; it never executes the accepted command. Ordinary command execution is a separate user action. Existing valid paths must not be replaced by fuzzy alternatives. Exact/prefix results precede corrections, with clear labels.
 
-Unsupported syntax must retain its input. Filenames and descriptions are untrusted terminal content. Test spaces, quotes, Unicode, controls, symlinks, relative paths, tilde, and edits away from the end of the buffer.
+Custom correction retains conservative syntax checks. Unsupported input delegates to the captured supported completion widget; any resulting editing is the original shell/plugin behavior, not helper correction. The helper does not evaluate the buffer. Filenames and descriptions are untrusted terminal content. Test spaces, quotes, Unicode, controls, symlinks, relative paths, tilde, and edits away from the end of the buffer.
 
 Native shell completion does not know Python/Jupyter runtime objects. CSV, Parquet, and notebook suggestions are ordinary files.
 
@@ -49,3 +49,9 @@ See [updates](UPDATES.md) and [release procedure](RELEASING.md). A 0.2 user must
 `App/UpdateNotices.swift` keeps a default-enabled automatic-check preference, last attempt date and exact skipped version in local UserDefaults. The controller gates normal launch and genuine Off→On events on both suggestions On and that preference. It records a started attempt before the request. A 24-hour cooldown includes failed/cancelled attempts; clock rollback resets eligibility. No recurring timer or helper daemon schedules checks while the app merely remains running.
 
 The request reuses bounded public-release metadata validation. Off cancels it, and late callbacks must not show an offer. Update Now explicitly starts the existing verified installer, Remind Me Later leaves the attempt cooldown intact, and Skip This Version suppresses only the exact automatic version. Manual checks/updates remain available while Off and bypass the policy's cooldown/skipped version. Automatic checking never requests checksums or app assets. No preference/date/version record or terminal data is transmitted.
+
+## Binding fallback and doctor (development build)
+
+The integration captures supported widget bindings per emacs/viins map once and delegates Tab while Off or outside custom correction syntax. Unsafe macros stay untouched; later plugin bindings remain authoritative. Enable/disable changes shared state, not the wrapper stack. A native menu may remain until it closes, with state rechecked before accepting helper text. No polling or per-keystroke process is added.
+
+terminal-helper doctor collects this shell's loaded integration, current keymap and binding ownership in-process, separately from the app's version metadata. It reports missing/unsafe state and conflicts with reversible next steps, never repairs automatically or emits private input/history/environment values.
