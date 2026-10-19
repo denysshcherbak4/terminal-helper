@@ -46,13 +46,14 @@ enum UpdateCheck {
     case available(UpdateOffer)
 }
 
-// Short-lived, bounded requests exist only after an explicit update action.
+// Short-lived bounded requests serve enabled automatic metadata checks or explicit update actions.
 final class BoundedRequest: NSObject, URLSessionDataDelegate {
     let url: URL
     let limit: Int
     private var data = Data()
     private var completion: ((Result<Data, Error>) -> Void)?
     private var session: URLSession?
+    private let sessionLock = NSLock()
     init(url: URL, limit: Int, completion: @escaping (Result<Data, Error>) -> Void) {
         self.url = url; self.limit = limit; self.completion = completion
     }
@@ -75,16 +76,21 @@ final class BoundedRequest: NSObject, URLSessionDataDelegate {
         configuration.timeoutIntervalForRequest = 15; configuration.timeoutIntervalForResource = 60
         let queue = OperationQueue(); queue.maxConcurrentOperationCount = 1
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
-        self.session = session
+        sessionLock.lock(); self.session = session; sessionLock.unlock()
         var request = URLRequest(url: url)
         request.setValue("Terminal-Helper", forHTTPHeaderField: "User-Agent")
         request.setValue(url.host == "api.github.com" ? "application/vnd.github+json" : "application/octet-stream", forHTTPHeaderField: "Accept")
         session.dataTask(with: request).resume()
     }
+    func cancel() {
+        sessionLock.lock(); let active = session; sessionLock.unlock()
+        active?.invalidateAndCancel()
+    }
     private func finish(_ result: Result<Data, Error>) {
         guard let callback = completion else { return }
         completion = nil
-        session?.invalidateAndCancel(); session = nil
+        sessionLock.lock(); let active = session; session = nil; sessionLock.unlock()
+        active?.invalidateAndCancel()
         callback(result)
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
@@ -122,7 +128,7 @@ final class BoundedRequest: NSObject, URLSessionDataDelegate {
 
 enum TerminalUpdates {
     typealias Fetch = (URL, Int, @escaping (Result<Data, Error>) -> Void) -> Void
-    static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0"
+    static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.1"
     static let releasesURL = URL(string: "https://github.com/denysshcherbak4/terminal-helper/releases")!
     static let catalogURL = URL(string: "https://api.github.com/repos/denysshcherbak4/terminal-helper/releases/latest")!
     static let maximumDownload = 64 * 1024 * 1024

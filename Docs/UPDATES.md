@@ -1,5 +1,21 @@
 # Updates
 
+## Automatic notices: upcoming 0.3.1
+
+The currently published download is 0.3.0. Version 0.3.1 adds **Check for updates automatically** in Settings, enabled by default; your choice to disable it is preserved.
+
+An automatic check requires **suggestions On** and that checkbox enabled. It can start at normal app launch or when suggestions genuinely change Off→On. It requests the public GitHub release catalog only. No checksum, DMG or app is downloaded until you explicitly choose **Update Now** or invoke the existing manual update action.
+
+With a stable system clock, at most one automatic attempt starts per 24-hour window. The attempt date is recorded when the request starts, so failure or cancellation still uses the window. A backwards clock correction can reset eligibility rather than suppress checks indefinitely. There is no persistent timer/daemon: leaving the app running On overnight does not schedule a midnight or exact daily check. The next eligible launch/enable event is the next opportunity.
+
+The native offer gives three choices:
+
+- **Update Now:** explicitly start the existing verified download/installation flow below.
+- **Remind Me Later:** leave the version eligible for the next launch/enable event after the attempt cooldown; no timed reminder is scheduled.
+- **Skip This Version:** persist only this exact version's automatic suppression. A later newer published version can still be offered when eligible.
+
+Off cancels pending automatic checking, and late results do not show an offer. Manual Check for Updates, `terminal-helper check` and `terminal-helper update` remain available while Off and ignore the automatic checkbox, cooldown and skipped version. Published numeric release and trust rules below are unchanged.
+
 ## One final manual upgrade from 0.2
 
 Automatic installation starts in **0.3.0**. An already-installed 0.2 executable keeps its old behavior: its update command verifies and opens a DMG for manual replacement. Publishing a release cannot change that installed executable.
@@ -18,7 +34,7 @@ terminal-helper check
 terminal-helper update
 ```
 
-`check` only checks. In 0.3+, `update` explicitly requests download and installation of a newer published release. Nothing downloads or installs on startup or on a timer. Explicit commands remain available while suggestions are Off.
+`check` only checks. In 0.3+, `update` explicitly requests download and installation of a newer published release. App archives are not downloaded or installed on startup or on a timer. In 0.3.1, the gated automatic check above can request catalog metadata. Explicit commands remain available while suggestions are Off.
 
 The updater verifies the DMG, expected app identity, release version and signature integrity before replacing the installed app. It requests the controller to save Off and quit, swaps the app, refreshes exact owned integration data, and reopens through macOS Launch Services. **Suggestions stay Off. Restart terminal windows, then enable them deliberately.**
 
@@ -48,7 +64,7 @@ If macOS blocks reopening, the updater must not bypass it. Users trusting the ex
 
 ## Trust and privacy
 
-Requests occur only after an explicit action, including while suggestions are Off. There is no background checker, startup request, account or telemetry. GitHub/CDN sees ordinary network metadata, never terminal contents or local filesystem data.
+In 0.3.1, an eligible launch/enable event can make an automatic metadata-only request while both suggestions and automatic checking are enabled. Manual requests also remain available while Off. There is no persistent daily timer, daemon, account or telemetry. The automatic preference, last attempt date and exact skipped version remain local non-sensitive UserDefaults data. GitHub/CDN sees ordinary network metadata, never terminal contents or local filesystem data.
 
 Metadata is limited to 512 KiB, checksums to 16 KiB and the DMG to 64 MiB. HTTPS origins, exact repository/tag paths, numeric versions, unique asset selection, upload state and sizes are validated. Redirects stay within allowed GitHub HTTPS endpoints; TLS verification is not overridden. Streaming bounds and timeouts apply.
 

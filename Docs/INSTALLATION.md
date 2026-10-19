@@ -11,6 +11,12 @@ Never override malware/damaged-app warnings, globally disable Gatekeeper, strip 
 
 The universal app targets macOS 13+, arm64/x86_64. Runtime CI covers macOS 15 on both architectures; native-terminal/VoiceOver/oldest-system checks remain in [verification](VERIFICATION.md).
 
+## Automatic notice setting in 0.3.1
+
+The public download is still 0.3.0 until 0.3.1 is published. In 0.3.1, Settings → **Check for updates automatically** defaults On and remembers an Off choice. When suggestions are On, a normal launch or genuine Off→On change may check release metadata subject to a 24-hour attempt cooldown. There is no exact daily timer, automatic DMG download or unattended installation. Turning suggestions Off cancels pending automatic checking.
+
+Choose Update Now to install, Remind Me Later to wait for the next eligible event, or Skip This Version to suppress only that exact automatic offer. Manual checking/updating still works while Off and ignores skipped versions. See [update timing and privacy](UPDATES.md).
+
 ## Verify, update and remove
 
 Checksums in SHA256SUMS.txt and the per-DMG .sha256 file verify matching bytes, not publisher identity. From the folder containing the named DMG and checksum, optional native verification is shasum -a 256 -c Terminal-Helper-0.3.0-universal.dmg.sha256.

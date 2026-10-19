@@ -32,6 +32,18 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var operationStatus = ""
     private var updateStatus = ""
     private var updateBusy = false
+    private var noticePolicy = UpdateNoticePolicy()
+    private var automaticRequest: BoundedRequest?
+    private var automaticCheckActive = false
+    private var automaticGeneration = 0
+    private var automaticCheckbox: NSButton?
+    private var cachedOffer: UpdateOffer?
+    private var offerMenuItem: NSMenuItem?
+    private var noticeTestOffers: [String] = []
+    private var noticeTestButtons: [String] = []
+    private var diagnosticRun: Bool {
+        CommandLine.arguments.contains { $0.hasSuffix("-self-test") || ["--self-test", "--lifecycle-test", "--smoke-test", "--ui-smoke-test", "--render-preview", "--measure-idle", "--appearance"].contains($0) }
+    }
     private var updateMenuItem: NSMenuItem?
     private var updateButton: NSButton?
     private var settingsUpdateStatus: NSTextField?
@@ -72,6 +84,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add("Help", action: #selector(showHelp))
         let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         updates.target = self; updateMenuItem = updates; menu.addItem(updates)
+        let offer = NSMenuItem(title: "Update available…", action: #selector(showCachedOffer), keyEquivalent: "")
+        offer.target = self; offer.isHidden = true; offerMenuItem = offer; menu.addItem(offer)
         menu.addItem(.separator())
         add("Disable and Quit", action: #selector(disableAndQuit), key: "q")
         item.menu = menu
@@ -90,10 +104,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else if (!integrationInstalled || integrationNeedsUpdate) && CommandLine.arguments.count == 1 { showSettings() }
         if lifecycleRoot != nil {
             DispatchQueue.main.async {
-                if CommandLine.arguments.contains("--settings-self-test") { self.settingsSelfTest() }
+                if CommandLine.arguments.contains("--update-notice-self-test") { self.updateNoticeSelfTest() }
+                else if CommandLine.arguments.contains("--settings-self-test") { self.settingsSelfTest() }
                 else { self.lifecycleTest() }
             }
         }
+        if CommandLine.arguments.count == 1 { checkAutomaticallyIfDue() }
         if CommandLine.arguments.contains("--smoke-test") { showSettings() }
         if let position = CommandLine.arguments.firstIndex(where: { $0 == "--ui-smoke-test" || $0 == "--render-preview" }), position + 1 < CommandLine.arguments.count {
             showSettings()
@@ -191,6 +207,12 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         uninstallButton?.isEnabled = installed && worker == nil && updateInstaller == nil
         updateMenuItem?.isEnabled = !updateBusy
         updateButton?.isEnabled = !updateBusy
+        automaticCheckbox?.state = noticePolicy.isEnabled ? .on : .off
+        offerMenuItem?.isEnabled = !updateBusy
+        if let offer = cachedOffer, noticePolicy.skippedVersion != offer.version {
+            offerMenuItem?.title = "Version " + offer.version + " available…"
+            offerMenuItem?.isHidden = false
+        } else { offerMenuItem?.isHidden = true }
         settingsUpdateStatus?.stringValue = updateStatus
         settingsUpdateStatus?.isHidden = updateStatus.isEmpty
     }
@@ -199,7 +221,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             operationStatus = updateInstaller != nil ? "Wait for the app update to finish." : (worker != nil ? "Wait for shell integration to finish." : (integrationNeedsUpdate ? "Update shell integration before enabling suggestions, then restart open shells." : "Install shell integration before enabling suggestions."))
             showSettings(); return
         }
-        do { try state.write(enabled: !state.enabled()); operationStatus = ""; refresh() }
+        do {
+            if state.enabled() { try disableSuggestions() }
+            else { try state.write(enabled: true); checkAutomaticallyIfDue() }
+            operationStatus = ""; refresh()
+        }
         catch { report("Could not change suggestions", detail: String(describing: error)) }
     }
     private func settingsSelfTest() {
@@ -238,6 +264,146 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         print("PASS native Settings: setup and upgrade guards, On/Off controls, version and manual update availability (no network)")
         quitting = true
         NSApp.terminate(nil)
+    }
+    private func updateNoticeSelfTest() {
+        func check(_ value: Bool, _ message: String) {
+            if !value { fputs("Update notice test failed: \(message)\n", stderr); exit(1) }
+        }
+        guard let root = lifecycleRoot else { exit(1) }
+        let suite = "io.github.denysshcherbak4.terminal-helper.notice-test." + UUID().uuidString
+        guard let defaults = UserDefaults(suiteName: suite) else { exit(1) }
+        noticePolicy = UpdateNoticePolicy(defaults: defaults)
+        let now = Date(), day = UpdateNoticePolicy.interval
+        var calls = 0
+        var pending: [(Result<Data, Error>) -> Void] = []
+        let fetch: TerminalUpdates.Fetch = { url, limit, completion in
+            check(url == TerminalUpdates.catalogURL && limit == 512 * 1024, "bounded metadata only")
+            calls += 1; pending.append(completion)
+        }
+        func setState(_ enabled: Bool) {
+            do { try self.state.write(enabled: enabled) }
+            catch { check(false, "private state write") }
+        }
+        func data(_ version: String) -> Data {
+            let tag = "v" + version
+            let name = "Terminal-Helper-" + version + "-universal.dmg"
+            let base = "https://github.com/denysshcherbak4/terminal-helper/releases/download/" + tag + "/"
+            return try! JSONSerialization.data(withJSONObject: ["tag_name": tag, "draft": false, "prerelease": false, "assets": [
+                ["name": name, "browser_download_url": base + name, "size": 1, "state": "uploaded"],
+                ["name": "SHA256SUMS.txt", "browser_download_url": base + "SHA256SUMS.txt", "size": 1, "state": "uploaded"]]])
+        }
+        func respond(_ version: String) {
+            check(!pending.isEmpty, "expected a pending metadata callback")
+            pending.removeFirst()(.success(data(version)))
+        }
+        var steps: [() -> Void] = [
+            {
+                setState(false); self.showSettings()
+                check(self.automaticCheckbox?.title == "Check for updates automatically" && self.automaticCheckbox?.state == .on, "native default preference")
+                self.checkAutomaticallyIfDue(now: now, fetch: fetch)
+                check(calls == 0, "Off makes no automatic request")
+                do {
+                    try self.bundledIntegration!.write(to: self.integrationURL)
+                    chmod(self.integrationURL.path, 0o600)
+                } catch { check(false, "private integration fixture") }
+                self.changeEnabled(); check(self.state.enabled(), "actual Enable action")
+                self.checkAutomaticallyIfDue(now: now, fetch: fetch)
+                check(calls == 1 && self.automaticCheckActive, "due check starts")
+                self.changeEnabled()
+                check(!self.state.enabled() && !self.automaticCheckActive, "actual Off cancels automatic work")
+                respond("999.0.0")
+            },
+            {
+                check(self.noticeTestOffers.isEmpty, "late Off response ignored")
+                self.changeEnabled()
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(1), fetch: fetch)
+                check(calls == 1, "no relaunch or re-enable repetition inside daily interval")
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(day), fetch: fetch)
+                check(calls == 2, "next daily boundary checks")
+                self.automaticCheckbox?.state = .off; self.changeAutomaticChecks()
+                check(!self.noticePolicy.isEnabled && !self.automaticCheckActive, "preference Off cancels automatic work")
+                respond("999.0.0")
+            },
+            {
+                check(self.noticeTestOffers.isEmpty, "late disabled-preference response ignored")
+                self.automaticCheckbox?.state = .on; self.changeAutomaticChecks()
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(2 * day), fetch: fetch)
+                check(calls == 3, "preference re-enable can check when due")
+                respond("999.0.0")
+            },
+            {
+                check(self.noticeTestOffers == ["999.0.0"], "available version presented")
+                check(self.noticeTestButtons == ["Update Now", "Remind Me Later", "Skip This Version"], "actual native notice buttons")
+                let offer = self.cachedOffer!
+                self.handleOfferResponse(.alertSecondButtonReturn, offer: offer)
+                check(self.offerMenuItem?.isHidden == false, "reminder keeps explicit menu offer")
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(2 * day + 1), fetch: fetch)
+                check(calls == 3, "reminder respects next daily interval")
+                self.handleOfferResponse(.alertThirdButtonReturn, offer: offer)
+                check(self.noticePolicy.skippedVersion == offer.version && self.offerMenuItem?.isHidden == true, "Skip persists exact version and hides offer row")
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(3 * day), fetch: fetch)
+                respond("999.0.0")
+            },
+            {
+                check(self.noticeTestOffers.count == 1, "skipped version is silent automatically")
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(4 * day), fetch: fetch)
+                respond("999.0.1")
+            },
+            {
+                check(self.noticeTestOffers == ["999.0.0", "999.0.1"], "higher version still offered")
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(5 * day), fetch: fetch)
+                check(!pending.isEmpty, "pending error fixture")
+                pending.removeFirst()(.failure(UpdateFailure.invalid("test connection failure")))
+            },
+            {
+                check(self.noticeTestOffers.count == 2 && !self.updateStatus.isEmpty, "automatic error stays inline without notice")
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(5 * day + 1), fetch: fetch)
+                check(calls == 6, "failed attempt is throttled")
+                self.changeEnabled()
+                self.automaticCheckbox?.state = .off; self.changeAutomaticChecks()
+                self.beginManualCheck(fetch: fetch)
+                check(calls == 7, "manual check bypasses Off, preference, skip and throttle")
+                respond("999.0.0")
+            },
+            {
+                check(self.noticeTestOffers.last == "999.0.0" && self.noticeTestOffers.count == 3, "manual check presents skipped version")
+                check(self.updateButton?.isEnabled == true, "manual check remains available")
+                self.automaticCheckbox?.state = .on; self.changeAutomaticChecks()
+                self.changeEnabled()
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(6 * day), fetch: fetch)
+                check(calls == 8 && self.automaticCheckActive, "pending request before uninstall Off transition")
+                do { try self.disableSuggestions() }
+                catch { check(false, "shared uninstall Off transition") }
+                check(!self.state.enabled() && !self.automaticCheckActive && self.automaticRequest == nil, "uninstall shared Off transition cancels immediately")
+                respond("999.0.2")
+            },
+            {
+                check(self.noticeTestOffers.count == 3, "late response after uninstall Off transition is ignored")
+                self.changeEnabled()
+                let modal = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 120), styleMask: [.titled], backing: .buffered, defer: false)
+                modal.isReleasedWhenClosed = false
+                let session = NSApp.beginModalSession(for: modal)
+                _ = NSApp.runModalSession(session)
+                check(NSApp.modalWindow != nil, "actual AppKit modal session")
+                guard case .available(let offer) = try! TerminalUpdates.parse(data("999.0.3"), current: TerminalUpdates.currentVersion) else { check(false, "modal offer fixture"); return }
+                self.presentUpdateOffer(offer, automaticGeneration: self.automaticGeneration)
+                check(self.noticeTestOffers.count == 3, "automatic notice does not interrupt an existing modal task")
+                check(self.cachedOffer?.version == offer.version && self.offerMenuItem?.isHidden == false && self.offerMenuItem?.isEnabled == true, "deferred notice retains explicit version menu action")
+                NSApp.endModalSession(session); modal.close()
+                self.changeEnabled()
+                defaults.removePersistentDomain(forName: suite)
+                do { try FileManager.default.removeItem(at: root) }
+                catch { check(false, "private fixture cleanup") }
+                print("PASS native update notices: default preference, Off cancellation, late responses, daily retry, reminder, skip, higher release, manual override, uninstall Off cancellation and modal deferral (no network)")
+                self.quitting = true; NSApp.terminate(nil)
+            }
+        ]
+        func next() {
+            guard !steps.isEmpty else { return }
+            steps.removeFirst()()
+            DispatchQueue.main.async { next() }
+        }
+        next()
     }
     private func lifecycleTest() {
         if CommandLine.arguments.contains("--termination-self-test") {
@@ -328,7 +494,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return .terminateNow
         }
         do {
-            try state.write(enabled: false)
+            try disableSuggestions()
             quitting = true
             refresh()
             if let worker = worker, worker.isRunning {
@@ -346,7 +512,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func disableAndQuit() {
         guard !quitting || !cancelUpdateOnQuit else { return }
         do {
-            try state.write(enabled: false)
+            try disableSuggestions()
             quitting = true; cancelUpdateOnQuit = true
             if updateInstaller != nil { updateStatus = "Cancelling the update before quitting…" }
             refresh()
@@ -357,9 +523,9 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc private func showSettings() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 560), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 650), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             w.title = "Terminal Helper Settings"; w.isReleasedWhenClosed = false
-            w.contentMinSize = NSSize(width: 460, height: 540)
+            w.contentMinSize = NSSize(width: 460, height: 630)
             let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 14
             stack.translatesAutoresizingMaskIntoConstraints = false
             w.contentView!.addSubview(stack)
@@ -397,6 +563,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let updates = NSButton(title: "Check for Updates…", target: self, action: #selector(checkForUpdates))
             updates.setAccessibilityHelp("Check GitHub for a published release only when you request it.")
             stack.addArrangedSubview(updates); updateButton = updates
+            let automatic = NSButton(checkboxWithTitle: "Check for updates automatically", target: self, action: #selector(changeAutomaticChecks))
+            automatic.setAccessibilityHelp("While suggestions are On, check at launch or when enabled, at most once every 24 hours. No checks while Off.")
+            stack.addArrangedSubview(automatic); automaticCheckbox = automatic
+            _ = paragraph("While suggestions are On: check at launch or when enabled, at most once every 24 hours. No timer runs while the app stays open.")
             settingsUpdateStatus = paragraph("")
             settingsUpdateStatus?.setAccessibilityLabel("Update result")
             window = w; w.center()
@@ -430,10 +600,65 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         helpWindow?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
-    @objc private func checkForUpdates() {
+    private func disableSuggestions() throws {
+        try state.write(enabled: false)
+        cancelAutomaticCheck()
+    }
+    private func cancelAutomaticCheck() {
+        automaticGeneration += 1
+        automaticRequest?.cancel(); automaticRequest = nil
+        if automaticCheckActive { updateStatus = "" }
+        automaticCheckActive = false
+    }
+    @objc private func changeAutomaticChecks() {
+        noticePolicy.isEnabled = automaticCheckbox?.state == .on
+        if noticePolicy.isEnabled { checkAutomaticallyIfDue() }
+        else { cancelAutomaticCheck() }
+        refresh()
+    }
+    private func checkAutomaticallyIfDue(now: Date = Date(), fetch: TerminalUpdates.Fetch? = nil) {
+        guard (!diagnosticRun || fetch != nil), !quitting, state.enabled(), noticePolicy.isEnabled,
+              !automaticCheckActive, !updateBusy, worker == nil, updateInstaller == nil,
+              noticePolicy.shouldCheck(now: now) else { return }
+        noticePolicy.recordAttempt(now: now)
+        automaticGeneration += 1
+        let generation = automaticGeneration
+        automaticCheckActive = true
+        updateStatus = "Checking for updates automatically…"; refresh()
+        let load: TerminalUpdates.Fetch = fetch ?? { url, limit, completion in
+            let request = BoundedRequest(url: url, limit: limit, completion: completion)
+            self.automaticRequest = request; request.start()
+        }
+        TerminalUpdates.check(fetch: load) { result in
+            DispatchQueue.main.async {
+                guard generation == self.automaticGeneration else { return }
+                self.automaticRequest = nil; self.automaticCheckActive = false
+                guard !self.quitting, self.state.enabled(), self.noticePolicy.isEnabled else { self.refresh(); return }
+                switch result {
+                case .failure:
+                    self.updateStatus = "Automatic update check could not complete. Use Check for Updates to retry."
+                case .success(.noPublishedRelease): self.updateStatus = "No published release is available yet."
+                case .success(.upToDate): self.updateStatus = "Version " + TerminalUpdates.currentVersion + " is up to date."
+                case .success(.available(let offer)):
+                    if self.noticePolicy.shouldOffer(version: offer.version) {
+                        self.presentUpdateOffer(offer, automaticGeneration: generation)
+                    } else { self.updateStatus = "This update version was skipped. Manual checks still show it." }
+                }
+                self.refresh()
+            }
+        }
+    }
+    @objc private func showCachedOffer() {
+        guard !updateBusy, let offer = cachedOffer else { return }
+        presentUpdateOffer(offer)
+    }
+    @objc private func checkForUpdates() { beginManualCheck() }
+    private func beginManualCheck(fetch: @escaping TerminalUpdates.Fetch = BoundedRequest.fetch) {
         guard !updateBusy else { return }
+        cancelAutomaticCheck()
+        noticePolicy.recordAttempt()
         updateBusy = true; updateStatus = "Checking for a published release…"; refresh()
-        TerminalUpdates.check { result in
+        TerminalUpdates.check(fetch: fetch) { result in
             DispatchQueue.main.async {
                 guard !self.quitting else { return }
                 self.updateBusy = false
@@ -447,17 +672,42 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 case .success(.upToDate):
                     self.updateStatus = "Version " + TerminalUpdates.currentVersion + " is up to date."
                     self.refresh(); self.report("You are up to date", detail: self.updateStatus)
-                case .success(.available(let offer)):
-                    self.updateStatus = "Version " + offer.version + " is available."
-                    self.refresh()
-                    let alert = NSAlert()
-                    alert.messageText = "Terminal Helper " + offer.version + " is available"
-                    alert.informativeText = "This free beta is ad-hoc signed, without Developer ID or Apple notarization. Downloading verifies its published checksum. You will be asked before installation closes and replaces this app. macOS may require approval when reopening it."
-                    alert.addButton(withTitle: "Download Update"); alert.addButton(withTitle: "Not Now")
-                    if alert.runModal() == .alertFirstButtonReturn { self.downloadUpdate(offer) }
+                case .success(.available(let offer)): self.presentUpdateOffer(offer)
                 }
             }
         }
+    }
+    private func presentUpdateOffer(_ offer: UpdateOffer, automaticGeneration generation: Int? = nil) {
+        if let generation {
+            guard generation == automaticGeneration, !quitting, state.enabled(), noticePolicy.isEnabled,
+                  noticePolicy.shouldOffer(version: offer.version) else { return }
+        }
+        cachedOffer = offer
+        updateStatus = "Version " + offer.version + " is available."; refresh()
+        if generation != nil && NSApp.modalWindow != nil { return }
+        let alert = NSAlert()
+        alert.messageText = "Terminal Helper " + offer.version + " is available"
+        alert.informativeText = "Update Now downloads and verifies this free ad-hoc beta. You will be asked before installation closes and replaces the app. macOS may require approval when reopening it."
+        alert.addButton(withTitle: "Update Now")
+        alert.addButton(withTitle: "Remind Me Later")
+        alert.addButton(withTitle: "Skip This Version")
+        if CommandLine.arguments.contains("--update-notice-self-test") {
+            noticeTestOffers.append(offer.version); noticeTestButtons = alert.buttons.map { $0.title }
+            return
+        }
+        let response = alert.runModal()
+        if let generation {
+            guard generation == automaticGeneration, !quitting, state.enabled(), noticePolicy.isEnabled else { return }
+        }
+        handleOfferResponse(response, offer: offer)
+    }
+    private func handleOfferResponse(_ response: NSApplication.ModalResponse, offer: UpdateOffer) {
+        switch response {
+        case .alertFirstButtonReturn: cancelAutomaticCheck(); downloadUpdate(offer)
+        case .alertThirdButtonReturn: noticePolicy.skip(version: offer.version)
+        default: break
+        }
+        refresh()
     }
     private func downloadUpdate(_ offer: UpdateOffer) {
         guard !updateBusy else { return }
@@ -522,7 +772,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.informativeText = "Suggestions will be disabled and the owned shell configuration block and integration files removed. Open shells must be restarted."
         alert.addButton(withTitle: "Uninstall"); alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do { try state.write(enabled: false) } catch { report("Could not disable safely", detail: String(describing: error)); return }
+        do { try disableSuggestions(); refresh() } catch { report("Could not disable safely", detail: String(describing: error)); return }
         runIntegration("uninstall")
     }
     private func runIntegration(_ operation: String) {
@@ -581,7 +831,7 @@ if CommandLine.arguments.contains("--self-test") {
     do { try stateSelfTest(); exit(0) } catch { fputs("\(error)\n", stderr); exit(1) }
 }
 let application = NSApplication.shared
-let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test") || CommandLine.arguments.contains("--termination-self-test") || CommandLine.arguments.contains("--update-cancel-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
+let lifecycleRoot = (CommandLine.arguments.contains("--lifecycle-test") || CommandLine.arguments.contains("--settings-self-test") || CommandLine.arguments.contains("--termination-self-test") || CommandLine.arguments.contains("--update-cancel-self-test") || CommandLine.arguments.contains("--update-notice-self-test")) ? FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-lifecycle-" + UUID().uuidString) : nil
 let controller = Controller(lifecycleRoot: lifecycleRoot)
 application.delegate = controller
 application.run()

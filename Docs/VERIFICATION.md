@@ -29,9 +29,17 @@ Published [0.3.0](https://github.com/denysshcherbak4/terminal-helper/releases/ta
 
 These commands run only on disposable remote macOS runners with empty user Applications/support fixture paths and no running Terminal Helper instance. The full installer and controller fixtures use the account's actual home; never clear a real installation to satisfy their guards. See [reproducible commands](../README.md#verification-and-development).
 
-Installed users can explicitly run `terminal-helper version`, `terminal-helper check` and `terminal-helper update` without an account or build tools. Version/check/update do not forward arbitrary arguments, and checks/downloads happen only on request. A 0.2 user still needs one manual Finder upgrade to 0.3 before subsequent in-place updates. Public-download trust, per-app opening approval, restart/re-enable and interrupted-update recovery remain separate manual checks; do not substitute fixture counts or historical timing values for them.
+Installed users can explicitly run `terminal-helper version`, `terminal-helper check` and `terminal-helper update` without an account or build tools. Version/check/update do not forward arbitrary arguments. In published 0.3.0, checks/downloads happen only on request; 0.3.1 additionally introduces the gated automatic metadata notices described below. A 0.2 user still needs one manual Finder upgrade to 0.3 before subsequent in-place updates. Public-download trust, per-app opening approval, restart/re-enable and interrupted-update recovery remain separate manual checks; do not substitute fixture counts or historical timing values for them.
 
 
+
+## Upcoming 0.3.1 notice verification
+
+The 0.3.1 branch adds automatic metadata notices; this section describes the required coverage, **not a claim that the final release candidate has passed**. Keep the published 0.3 evidence and measurements above separate.
+
+`Tests/UpdateNotices` exercises default/preserved preference, 24-hour attempt eligibility, failed/cancelled-attempt throttling, clock rollback, exact skipped version and synthetic newer versions. Native `--update-notice-self-test` must cover launch/real-enable gating, checkbox persistence, Off cancellation and late-result suppression, Update Now/Later/Skip choices, manual bypass and no automatic checksum/DMG request. Existing installer, network, CLI, PTY and controller lifecycle checks remain required.
+
+Compile the policy fixture with `State.swift`, `Updates.swift`, `UpdateInstaller.swift` and `UpdateNotices.swift`. Run app/UI tests only on the disposable remote macOS runner described in the [reproducible commands](../README.md#verification-and-development). Record exact-source ARM/Intel results, explicit skips and native limits before publishing 0.3.1; do not invent new pass counts or reuse 0.3 timing as a new measurement.
 
 ## Published 0.3 measured snapshot
 

@@ -18,6 +18,8 @@ A free signature does not identify the publisher to Apple or provide malware not
 
 **Version 0.3.0 is published.** The direct download above includes in-place installation for subsequent updates. [Release notes and verification](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.0).
 
+**Upcoming 0.3.1:** optional automatic update notices are being added on this branch. The public download above remains 0.3.0 until the new release is published.
+
 ## Update without building anything
 
 Choose **Check for Updates…** in the menu-bar app, or run this after installing integration:
@@ -32,7 +34,15 @@ terminal-helper update
 
 **In v0.3 and later**, an explicit update action verifies and installs a newer app in place at `~/Applications/Terminal Helper.app` or an eligible user-owned `/Applications/Terminal Helper.app`. It retains an app backup, refreshes exact owned integration data without editing `.zshrc` or settings, and reopens through macOS Launch Services. **Suggestions remain Off: restart shells, then enable them.** Unsupported locations or permissions are refused without elevation. macOS approval may still be required.
 
-There are no timers, startup checks or background downloads. A maintainer must publish a new version before it is offered. Validation failures leave the installed app untouched; handled installation failures roll back. A retained backup supports interrupted-update recovery without promising a crash-proof app-and-integration transaction. [Update and recovery details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
+App archives are never downloaded or installed automatically. The upcoming 0.3.1 notice behavior below requests release metadata only. A maintainer must publish a new version before it is offered. Validation failures leave the installed app untouched; handled installation failures roll back. A retained backup supports interrupted-update recovery without promising a crash-proof app-and-integration transaction. [Update and recovery details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
+
+### Automatic update notices in 0.3.1
+
+When suggestions are **On** and **Settings → Check for updates automatically** is enabled (default On), a normal app launch or a real Off→On change can check GitHub's public release catalog. A 24-hour attempt cooldown throttles checks; a continuously running On app has no daily timer and does not promise a check at midnight or exactly every 24 hours. Your disabled preference is preserved.
+
+The native offer has **Update Now**, **Remind Me Later** and **Skip This Version**. Update Now explicitly starts the existing verified installation flow. Later waits for the next eligible launch/enable event; Skip suppresses only that exact version's automatic offer. Manual checks/updates still work while Off and ignore skipped versions and the automatic cooldown.
+
+Turning Off cancels a pending automatic check; late results do not show an offer. Automatic checks fetch no checksum or DMG. [Timing, failure and privacy details](Docs/UPDATES.md)
 
 <details>
 <summary>See the native app</summary>
@@ -71,7 +81,7 @@ Install/repair/uninstall are repeatable, serialize their own operations and refu
 
 No telemetry, history/command collection, cloud AI, database, whole-disk index, global keyboard monitor, Accessibility permission or screen recording. Suggestions run locally.
 
-Only a requested update contacts GitHub/CDN, which sees normal request metadata such as your IP address. Commands, history, environment, private filenames and configuration are never sent. Checksums detect mismatched bytes; they do not establish a trusted publisher identity. Third-party completion code retains its own trust boundary.
+In 0.3.1, enabled automatic notices can contact GitHub for metadata while suggestions are On; requested updates also contact GitHub/CDN. Those services see normal request metadata such as your IP address. Commands, history, environment, private filenames and configuration are never sent. Checksums detect mismatched bytes; they do not establish a trusted publisher identity. Third-party completion code retains its own trust boundary.
 
 [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Report vulnerabilities privately](https://github.com/denysshcherbak4/terminal-helper/security/advisories/new). GitHub secret scanning and push protection are enabled.
 
@@ -92,12 +102,15 @@ python3 Tests/Shell/test_install.py
 python3 Tests/Shell/test_cli.py
 swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/Updates/main.swift -o build/update-tests -framework AppKit -framework CoreServices
 build/update-tests
+swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift App/UpdateNotices.swift Tests/UpdateNotices/main.swift -o build/update-notice-tests -framework AppKit -framework CoreServices
+build/update-notice-tests
 swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateInstaller/main.swift -o build/update-installer-tests -framework AppKit -framework CoreServices
 build/update-installer-tests
 swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/UpdateController/main.swift -o build/update-controller-tests -framework AppKit -framework CoreServices
 build/update-controller-tests "$PWD/dist/Terminal Helper.app"
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --settings-self-test
+"dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --update-notice-self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --lifecycle-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --termination-self-test
 "dist/Terminal Helper.app/Contents/MacOS/TerminalHelper" --update-cancel-self-test
@@ -105,6 +118,6 @@ python3 Tests/Performance/measure.py
 bash Scripts/package.sh
 ```
 
-The controller fixture runs **after the app build** and opens an unquarantined CI-built copy through Launch Services. This verifies the quit/Off handoff, not a downloaded app's Gatekeeper approval. The standalone update test programs all require the three shared Swift sources shown above. Record results only from the final exact-source complete CI run.
+The controller fixture runs **after the app build** and opens an unquarantined CI-built copy through Launch Services. This verifies the quit/Off handoff, not a downloaded app's Gatekeeper approval. Standalone update tests require the shared sources shown above; notice-policy tests additionally include App/UpdateNotices.swift. Record results only from the final exact-source complete CI run.
 
 The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in Assets/ and App/Icon.swift. Licensed under [MIT](LICENSE).
