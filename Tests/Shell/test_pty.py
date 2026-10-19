@@ -29,7 +29,7 @@ class Shell:
         completion_setup = "autoload -Uz compinit; compinit -D; " if initialize_completion else ""
         self.send("PROMPT='TH> '; RPROMPT=''; setopt no_beep; bindkey -e; "
                   + completion_setup +
-                  "function dump_buffer() { print -r --; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
+                  "function dump_buffer() { print -r --; print -r -- DIRECTORY:${(qqq)PWD}; print -r -- DUMP:${(qqq)BUFFER}:$CURSOR; }; "
                   "zle -N dump_buffer; bindkey '^]' dump_buffer; print -r -- TH'_'READY\n")
         self.wait_for('TH_READY\r\n')
         if custom_enter:
@@ -345,17 +345,46 @@ class CompletionTests(unittest.TestCase):
         self.assertIn('cd ', out)
 
 
+
     def test_arrow_navigation_selects_exact_nonfirst_candidate(self):
         names = ['Choice_%02d_long_directory_name_for_single_column' % i for i in range(1, 5)]
         for name in names:
             (self.home / name).mkdir()
-        out = self.complete('cd Choice_')
-        self.assertRegex(out, r'\x1b\[[0-9;]*7m', 'Active candidate must be visibly reverse-highlighted')
-        self.shell.send('\x1b[B\x1b[B\x1b[A\r')
+        for down, up in [('\x1b[B', '\x1b[A'), ('\x1bOB', '\x1bOA')]:
+            with self.subTest(down=repr(down)):
+                self.shell.send('\x15')
+                out = self.complete('cd Choice_')
+                self.assertRegex(out, r'\x1b\[[0-9;]*7m',
+                                 'Active candidate must be visibly reverse-highlighted')
+                self.shell.send(down + down + up + '\r')
+                self.shell.read()
+                out = self.shell.buffer()
+                expected = 'cd ' + names[1] + '/'
+                self.assertIn('DUMP:"' + expected + '":' + str(len(expected)), out)
+                self.assertIn('DIRECTORY:"' + str(self.home) + '"', out)
+
+    def test_long_menu_scroll_selects_candidate_beyond_visible_rows(self):
+        names = ['Scroll_%02d_long_directory_name_for_single_column' % i for i in range(1, 15)]
+        for name in names:
+            (self.home / name).mkdir()
+        fcntl.ioctl(self.shell.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 8, 60, 0, 0))
+        os.kill(self.shell.pid, signal.SIGWINCH)
+        self.complete('cd Scroll_')
+        self.shell.send('\x1b[B' * 10 + '\r')
         self.shell.read()
         out = self.shell.buffer()
-        self.assertIn('DUMP:"cd ' + names[1] + '/":', out)
-        self.assertNotIn('DUMP:"cd ' + names[0] + '/":', out)
+        self.assertIn('DUMP:"cd ' + names[10] + '/":', out)
+        self.assertIn('DIRECTORY:"' + str(self.home) + '"', out)
+
+    def test_arrow_selection_escape_restores_middle_cursor_and_suffix(self):
+        for name in ['Choice_01_long_directory_name', 'Choice_02_long_directory_name']:
+            (self.home / name).mkdir()
+        original = 'cat Choice_ tail'
+        self.shell.send(original + '\x1b[D' * 5 + '\t')
+        self.shell.read(0.8)
+        self.shell.send('\x1b[B\x1b')
+        self.shell.read(0.5)
+        self.assertIn('DUMP:"' + original + '":11', self.shell.buffer())
 
     def test_executable_completion(self):
         self.complete('pytho')
