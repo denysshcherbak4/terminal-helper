@@ -135,3 +135,28 @@ See [manual verification](MANUAL-VERIFICATION.md) for actual Terminal.app/iTerm2
 
 
 [Published v0.3.1 production CLI installation passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39215155982): current updater source built with VERSION=0.1.0 as an older-version fixture anonymously downloaded and installed public 0.3.1. SHA-256, signature integrity, installed bundle/executable quarantine, retained previous app, Off, exact owned integration and preserved shell configuration passed. This is current source with an older fixture version, not a historical v0.1 binary. Launch Services reopening was requested; consumer Gatekeeper approval remains manual.
+
+
+## Published 0.3.2 highlighted completion verification
+
+Published [0.3.2](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.2) uses native menu selection, with reverse highlighting, Up/Down navigation through short and scrolling lists, text-only acceptance and exact Escape cancellation. Protected native keymaps are preserved, including user widgets/macros, and Off is rechecked after native selection returns and before acceptance.
+
+Exact-source [ARM/Intel CI passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39228014768) at 563aee498d05b2909e5576ffb30a7f8a7d34501a. Each architecture passed 37 actual PTY cases (one default-filesystem skip covered by dedicated case-sensitive HFSX), 8 shell installer cases, 8 management cases, 78 update assertions, 72 native installer assertions, 34 update-notice policy assertions, native controller/lifecycle tests, universal build/signature and package verification. Terminal.app AppleEvents/display smoke explicitly skipped; consumer terminal, VoiceOver, oldest macOS and opening approval remain manual. Source review found no remaining confirmed issue; the formal local-checkout security scanner was not run. The app includes GPLv3 and historical MIT notices; complete exact-build Corresponding Source is attached to the release.
+
+### Measured snapshot from the exact build
+GitHub-hosted macOS 15.7.9, zsh 5.9, Swift 6.1.2; Apple M1 Virtual / Intel i7-8700B 3.20GHz. Completion fixture: 256 entries, 30 repetitions. Startup: 40 paired fresh shells with identical compinit, no forced cache flush. Idle: 2s settling and six 1s samples.
+
+| Measurement | ARM | Intel |
+|---|---:|---:|
+| Configured first Tab | 18.94 ms | 81.12 ms |
+| Warm completion p95 | 21.64 ms | 43.26 ms |
+| Unconfigured first-Tab p95 | 230.05 ms | 927.96 ms |
+| Paired added-startup p95 | 6.70 ms | 554.42 ms |
+| Off median RSS | 50280 KiB | 24748 KiB |
+| Settled interval CPU | 0.37% | 1.42% |
+| Controller / owned children | 1 / 0 | 1 / 0 |
+
+The 30ms startup target was met on ARM and missed on Intel this run. The 100ms unconfigured-first-use target was missed on both. Shared VM scheduling varies substantially; negative paired medians do not imply speedup, and first observations are not guaranteed cold. Logical app size 1287037 bytes; selected universal ZIP 478280 bytes and DMG 785782 bytes. Off is an idle resident controller, not zero memory/CPU. Raw logs are in the linked CI artifacts.
+
+
+[Public v0.3.2 production CLI installation passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39231135188): current updater source built with VERSION=0.1.0 as an older-version fixture anonymously downloaded and installed public 0.3.2. Digest, signature integrity, bundle/executable quarantine, retained previous app, Off, exact owned integration and preserved shell configuration passed. This is current source with an older fixture version, not a historical v0.1 binary. Launch Services reopening was requested; consumer Gatekeeper approval remains manual.
