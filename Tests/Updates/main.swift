@@ -129,6 +129,28 @@ for result in [transport(bytes, declared: "9999", limit: 128),
                transport(bytes, limit: 128, status: 404)] {
     if case .failure = result { checks += 1 } else { expect(false, "bounded transport rejects size/status") }
 }
+final class PendingProtocol: URLProtocol {
+    static let started = DispatchSemaphore(value: 0)
+    static let stopped = DispatchSemaphore(value: 0)
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { Self.started.signal() }
+    override func stopLoading() { Self.stopped.signal() }
+}
+let cancellationDone = DispatchSemaphore(value: 0)
+var cancelledResult: Result<Data, Error>?
+let pendingConfiguration = URLSessionConfiguration.ephemeral
+pendingConfiguration.protocolClasses = [PendingProtocol.self]
+let pendingRequest = BoundedRequest(url: TerminalUpdates.catalogURL, limit: 128) {
+    cancelledResult = $0; cancellationDone.signal()
+}
+pendingRequest.start(configuration: pendingConfiguration)
+expect(PendingProtocol.started.wait(timeout: .now() + 5) == .success, "actual metadata transport started")
+DispatchQueue.concurrentPerform(iterations: 4) { _ in pendingRequest.cancel() }
+expect(cancellationDone.wait(timeout: .now() + 5) == .success, "cancellation completes without waiting for timeout")
+expect(PendingProtocol.stopped.wait(timeout: .now() + 5) == .success, "cancellation stops URL protocol loading")
+if case .failure? = cancelledResult { checks += 1 } else { expect(false, "cancelled transport cannot return data") }
+
 let root = FileManager.default.temporaryDirectory.appendingPathComponent("TerminalHelper-update-tests-\(UUID().uuidString)", isDirectory: true)
 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
 defer { try? FileManager.default.removeItem(at: root) }
