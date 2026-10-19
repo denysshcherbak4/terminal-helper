@@ -493,6 +493,23 @@ class CompletionTests(unittest.TestCase):
         self.complete('cd dents')
         self.assertIn('cd dents', self.shell.buffer())
 
+    def test_plugin_menu_rebind_during_cleanup_is_not_overwritten(self):
+        self.shell.send("function plugin_menu() { zle -M PLUGIN_MENU; }; zle -N plugin_menu; "
+                        "functions[_th_saved_restore]=$functions[_th_restore_menu]; "
+                        "function _th_restore_menu() { "
+                        "if (( ! _TH_SELECTING && _TH_MENU_ACTIVE )); then "
+                        "bindkey -M menuselect '^[[B' plugin_menu; fi; _th_saved_restore; }\r")
+        self.shell.read()
+        for name in ['ChoiceOne', 'ChoiceTwo']:
+            (self.home / name).mkdir()
+        self.complete('cd Cho')
+        self.shell.send('\r')
+        self.shell.read()
+        self.shell.send("\x15bindkey -M menuselect '^[[B'\r")
+        out = self.shell.read()
+        self.assertIn('plugin_menu', out)
+        self.assertNotIn('protected', out)
+
     def test_off_native_completion_matches_unintegrated_baseline(self):
         self.state(False)
         baseline = Shell(self.home, integrated=False)

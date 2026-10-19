@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Explicit shell management commands use only their recorded app bundle."""
 import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -130,7 +131,9 @@ class ManagementCommandTests(unittest.TestCase):
         plist.write_text('<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>0.3.3</string></dict></plist>')
         result = self.shell('terminal-helper doctor')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('Terminal Helper integration: 0.3.3', result.stdout)
+        integration = (ROOT / 'Integration/terminal-helper.zsh').read_text()
+        version = re.search(r'^typeset -gr _TH_INTEGRATION_VERSION=(\\S+)$', integration, re.M).group(1)
+        self.assertIn('Terminal Helper integration: ' + version, result.stdout)
         self.assertIn('Shared state: Off', result.stdout)
         self.assertIn('App version: 0.3.3 (recorded app metadata)', result.stdout)
         self.assertIn('emacs Tab:', result.stdout)

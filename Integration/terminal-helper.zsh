@@ -259,9 +259,16 @@ _th_completion() {
 _th_restore_menu() {
   (( _TH_SELECTING )) && return 0
   if (( _TH_MENU_ACTIVE )); then
-    local key
+    local key REPLY
     local -a binding
+    local -A expected
+    expected=('^M' _th_menu_accept '^J' _th_menu_accept '^I' menu-complete
+              '^[' _th_cancel '^[[B' menu-complete '^[OB' menu-complete
+              '^[[A' reverse-menu-complete '^[OA' reverse-menu-complete)
     for key in '^M' '^J' '^I' '^[' '^[[B' '^[OB' '^[[A' '^[OA'; do
+      # A plugin may have rebound a key during selection. Restore only our own binding.
+      _th_binding_widget menuselect "$key" || continue
+      [[ "$REPLY" == "${expected[$key]}" ]] || continue
       binding=( ${(z)"$(bindkey -M _th_user_menu -L "$key")"} )
       if (( ${binding[(Ie)-s]} )); then
         bindkey -M menuselect -s "${(@Q)binding[-2,-1]}"
