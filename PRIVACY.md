@@ -4,7 +4,7 @@ Terminal Helper has no accounts, telemetry, analytics, crash uploads or cloud AI
 
 ## Local suggestions and settings
 
-Completion examines the context and nearby entries locally when enabled and requested. It does not index the disk. Existing third-party completion code retains its own trust boundary, including any independent networking.
+Terminal Helper completion examines context and nearby entries locally when enabled and requested. It does not index the disk. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed. Ordinary completion or third-party plugins may independently scan files or use networking. It remains within its existing trust boundary and is not Terminal Helper assistance. Key macros that cannot be safely delegated stay untouched.
 
 Private On/Off state and integration live under ~/Library/Application Support/Terminal Helper. The non-executable mode-0600 app-path record stores the app bundle's absolute location for explicit terminal management commands; it is never evaluated as shell code or transmitted. A transient owned lock serializes installation/removal.
 
@@ -33,3 +33,7 @@ No global keyboard-monitoring, Accessibility, Screen Recording or password-inter
 Uninstall removes the owned block, integration, state and app-path marker, preserving unrelated configuration and backups. Restart shells before deleting the app or remaining owned support files. Delete saved download folders and retained app-backup folders separately. Removing integration does not reset the automatic-check preference or its local attempt/skip records. These app preferences may remain after the app is deleted; they stay on your device. There is no Terminal Helper cloud account or server data to erase.
 
 GitHub hosting/downloads, Apple operating-system security checks and optional reports are separate services. Send only synthetic, redacted reproductions in reports.
+
+## Explicit shell diagnostics (development build)
+
+terminal-helper doctor runs in the shell where you invoke it. It reads bounded owned state/app metadata and current keybinding ownership to distinguish installation from a loaded integration. It does not repair configuration, inspect history, print command buffers or macro payloads, or dump environment values. App metadata cannot prove which code an already-open shell loaded. No diagnostic information is uploaded.

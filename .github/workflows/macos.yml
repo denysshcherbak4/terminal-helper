@@ -124,6 +124,12 @@ jobs:
       - name: Unconfigured first Tab timing
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py --benchmark-uninitialized | tee results/completion-uninitialized.json
+      - name: Original configured completion timing
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_pty.py --benchmark-baseline | tee results/completion-baseline.json
+      - name: Original unconfigured first Tab timing
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_pty.py --benchmark-uninitialized-baseline | tee results/completion-uninitialized-baseline.json
       - name: Performance and native smoke test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: python3 Tests/Performance/measure.py

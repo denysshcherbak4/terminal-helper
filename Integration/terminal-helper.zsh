@@ -1,6 +1,8 @@
 # Sourced by the explicitly installed interactive zsh integration.
 [[ -o interactive ]] || return 0
 (( ${+_TH_LOADED} )) && return 0
+typeset -gr _TH_INTEGRATION_VERSION=0.3.3
+typeset -gA _TH_MAP_STATUS _TH_TAB_NAMES
 typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW='' _TH_MENU_ACTIVE=0 _TH_SELECTING=0
 
 # Explicit management commands work independently of the suggestions switch.
@@ -8,12 +10,13 @@ if ! whence -w terminal-helper >/dev/null 2>&1; then
   function terminal-helper {
     local flag base="$HOME/Library/Application Support/Terminal Helper" record app executable
     local -A info
-    (( $# == 1 )) || { print -u2 'Usage: terminal-helper version|check|update'; return 2; }
+    (( $# == 1 )) || { print -u2 'Usage: terminal-helper version|check|update|doctor'; return 2; }
     case "$1" in
+      doctor) _th_doctor; return $? ;;
       version) flag=--version ;;
       check) flag=--check-for-updates ;;
       update) flag=--update ;;
-      *) print -u2 'Usage: terminal-helper version|check|update'; return 2 ;;
+      *) print -u2 'Usage: terminal-helper version|check|update|doctor'; return 2 ;;
     esac
     zmodload zsh/stat zsh/mapfile || return 1
     if [[ ! -d "$base" || -L "$base" || ! -O "$base" ]] ||
@@ -55,6 +58,85 @@ _th_enabled() {
   (( (info[mode] & 8#777) == 8#600 && info[size] == 22 )) || return 1
   value=${mapfile[$base/state]}
   [[ "$value" == $'terminal-helper-v1:on\n' ]]
+}
+
+# Read widget names without evaluating bindkey output or exposing macro payloads.
+_th_binding_widget() {
+  local -a binding
+  binding=( ${(z)"$(bindkey -M "$1" -L "$2" 2>/dev/null)"} )
+  (( $#binding )) || { REPLY=unavailable; return 1; }
+  (( ${binding[(Ie)-s]} )) && { REPLY=macro; return 1; }
+  REPLY=${(Q)binding[-1]}
+  (( ${+widgets[$REPLY]} ))
+}
+
+_th_doctor() {
+  local base="$HOME/Library/Application Support/Terminal Helper" state_status='invalid or missing (helper disabled)'
+  local app_status='unavailable; reinstall integration from the app' record app plist version map owner diag_status shortcut REPLY
+  local -A info
+  print -r -- "Terminal Helper integration: $_TH_INTEGRATION_VERSION"
+  zmodload zsh/stat zsh/mapfile || { print -r -- 'Shell modules unavailable; restart zsh.'; return 1; }
+  if [[ -d "$base" && ! -L "$base" && -O "$base" ]] &&
+     zstat -H info -- "$base" 2>/dev/null && (( (info[mode] & 8#7777) == 8#700 )); then
+    if [[ -f "$base/state" && ! -L "$base/state" && -O "$base/state" ]] &&
+       zstat -H info -- "$base/state" 2>/dev/null &&
+       (( (info[mode] & 8#7777) == 8#600 && (info[size] == 22 || info[size] == 23) )); then
+      case "$mapfile[$base/state]" in
+        $'terminal-helper-v1:on\n') state_status=On ;;
+        $'terminal-helper-v1:off\n') state_status=Off ;;
+      esac
+    fi
+    if [[ -f "$base/app-path" && ! -L "$base/app-path" && -O "$base/app-path" ]] &&
+       zstat -H info -- "$base/app-path" 2>/dev/null &&
+       (( (info[mode] & 8#7777) == 8#600 && info[size] > 1 && info[size] <= 4097 )); then
+      record=$mapfile[$base/app-path]
+      app=$record[1,-2]
+      plist="$app/Contents/Info.plist"
+      if [[ "$record" == "$app"$'\n' && "$app" == /*.app && "$app" != *[[:cntrl:]]* &&
+            -d "$app" && ! -L "$app" && -f "$plist" && ! -L "$plist" ]] &&
+         zstat -H info -- "$plist" 2>/dev/null && (( info[size] <= 65536 )); then
+        # Fixed platform metadata reader; never run the recorded application or PATH tools.
+        version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2>/dev/null)
+        if [[ -n "$version" && ${#version} -le 40 && "$version" != *[^0-9.]* ]]; then
+          app_status="$version (recorded app metadata)"
+        fi
+      fi
+    fi
+  fi
+  print -r -- "Shared state: $state_status"
+  print -r -- "App version: $app_status"
+  local -a main_alias
+  main_alias=( ${(z)"$(bindkey -l -L main 2>/dev/null)"} )
+  if [[ "${(Q)main_alias[2]}" == -A ]]; then
+    print -r -- "Main keymap: ${(qqqq)${(Q)main_alias[3]}}"
+  else
+    print -r -- 'Main keymap: custom (inspect with bindkey -l -L main)'
+  fi
+  for map in emacs viins; do
+    if _th_binding_widget "$map" '^I'; then owner=$REPLY; else owner=$REPLY; fi
+    diag_status=${_TH_MAP_STATUS[$map]:-not installed}
+    if [[ "$diag_status" == integrated && "$owner" != "_th_tab_$map" ]]; then
+      diag_status='conflict: a later binding owns Tab; left untouched'
+    fi
+    print -r -- "$map Tab: ${(qqqq)owner}; $diag_status"
+    if _th_binding_widget "$map" '^X^P'; then
+      if [[ "$REPLY" == undefined-key ]]; then
+        shortcut=available
+      else
+        shortcut=${(qqqq)REPLY}
+        [[ "$REPLY" == _th_python_* ]] || shortcut="$shortcut (existing binding; left untouched)"
+      fi
+    elif [[ "$REPLY" == macro ]]; then
+      shortcut='macro (left untouched)'
+    else
+      shortcut=available
+    fi
+    print -r -- "$map Ctrl-X Ctrl-P: $shortcut"
+  done
+  print -r -- 'Off delegates your original Tab; it disables Terminal Helper corrections.'
+  print -r -- 'While On, unsupported input declines native expansion widgets; custom widget behavior remains yours.'
+  print -r -- 'To refresh bindings, open a new shell after loading completion plugins.'
+  print -r -- 'To remove integration, use Settings > Uninstall shell integration…, then open a new shell.'
 }
 
 _th_supported() {
@@ -104,8 +186,27 @@ _th_correct() {
 }
 
 _th_tab() {
-  _th_enabled || { zle -M 'Terminal Helper: Off'; return 0; }
-  _th_supported || { zle -M 'Terminal Helper: unsupported syntax; input unchanged'; return 0; }
+  local map=${WIDGET#_th_tab_}
+  if ! _th_enabled; then
+    if (( _TH_ACTIVE )); then BUFFER=$_TH_ORIGINAL; CURSOR=$_TH_CURSOR; fi
+    _TH_ACTIVE=0 _TH_CANCELLED=0 _TH_PREVIEW_SET=0
+    _th_restore_menu
+    zle "_th_original_tab_$map"
+    return
+  fi
+  if ! _th_supported; then
+    _TH_ACTIVE=0 _TH_CANCELLED=0 _TH_PREVIEW_SET=0
+    _th_restore_menu
+    # Native expansion widgets can execute command substitutions on Tab.
+    # Decline unsupported input while On instead of introducing that side effect.
+    case "${_TH_TAB_NAMES[$map]#.}" in
+      expand-or-complete|expand-or-complete-prefix|menu-expand-or-complete|expand-word|list-expand)
+        zle -M 'Terminal Helper: unsupported input; expanding Tab action declined'
+        return 0 ;;
+    esac
+    zle "_th_original_tab_$map"
+    return
+  fi
   if (( ! _TH_READY )); then
     zmodload zsh/complist || return 0
     zle -C _th_completion .menu-select _th_completion
@@ -170,9 +271,16 @@ _th_completion() {
 _th_restore_menu() {
   (( _TH_SELECTING )) && return 0
   if (( _TH_MENU_ACTIVE )); then
-    local key
+    local key REPLY
     local -a binding
+    local -A expected
+    expected=('^M' _th_menu_accept '^J' _th_menu_accept '^I' menu-complete
+              '^[' _th_cancel '^[[B' menu-complete '^[OB' menu-complete
+              '^[[A' reverse-menu-complete '^[OA' reverse-menu-complete)
     for key in '^M' '^J' '^I' '^[' '^[[B' '^[OB' '^[[A' '^[OA'; do
+      # A plugin may have rebound a key during selection. Restore only our own binding.
+      _th_binding_widget menuselect "$key" || continue
+      [[ "$REPLY" == "${expected[$key]}" ]] || continue
       binding=( ${(z)"$(bindkey -M _th_user_menu -L "$key")"} )
       if (( ${binding[(Ie)-s]} )); then
         bindkey -M menuselect -s "${(@Q)binding[-2,-1]}"
@@ -197,7 +305,7 @@ _th_accept() {
     zle -M ''
     return 0
   fi
-  zle _th_original_accept
+  zle .accept-line
 }
 
 _th_cancel() {
@@ -209,11 +317,7 @@ _th_cancel() {
     _th_restore_menu
     zle -M ''
   else
-    if (( ${+widgets[_th_original_escape]} )); then
-      zle _th_original_escape
-    else
-      zle send-break
-    fi
+    zle send-break
   fi
 }
 
@@ -239,11 +343,18 @@ _th_redraw() {
 }
 
 _th_return() {
-  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle _th_original_return; fi
+  local map=${WIDGET#_th_return_}
+  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle "_th_original_return_$map"; fi
 }
 
 _th_newline() {
-  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle _th_original_newline; fi
+  local map=${WIDGET#_th_newline_}
+  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_accept; else zle "_th_original_newline_$map"; fi
+}
+
+_th_escape() {
+  local map=${WIDGET#_th_escape_}
+  if (( _TH_ACTIVE || _TH_CANCELLED )); then _th_cancel; else zle "_th_original_escape_$map"; fi
 }
 
 _th_line_finish() { _TH_ACTIVE=0; _TH_CANCELLED=0; _th_restore_menu; }
@@ -254,28 +365,37 @@ _th_menu_accept() {
   return 0
 }
 
-# Key macros cannot be safely delegated as widgets; leave this shell unchanged.
-typeset -a _th_bindings
-_th_bindings=("${(@f)$(bindkey '^M'; bindkey '^J'; bindkey '^[')}")
-typeset _th_return_binding=${${(z)_th_bindings[1]}[-1]}
-typeset _th_newline_binding=${${(z)_th_bindings[2]}[-1]}
-typeset _th_escape_binding=${${(z)_th_bindings[3]}[-1]}
-(( ${+widgets[$_th_return_binding]} && ${+widgets[$_th_newline_binding]} && ${+widgets[$_th_escape_binding]} )) || return 0
-zle -A accept-line _th_original_accept
-zle -A "$_th_return_binding" _th_original_return
-zle -A "$_th_newline_binding" _th_original_newline
-zle -A "$_th_escape_binding" _th_original_escape
-unset _th_return_binding _th_newline_binding _th_escape_binding _th_bindings
-
-zle -N _th_tab
-zle -N _th_return
-zle -N _th_newline
-zle -N _th_accept
-zle -N _th_menu_accept
-zle -N _th_cancel
-# Tab is the explicit opt-in binding; Enter delegates unchanged when idle.
-bindkey '^I' _th_tab
-bindkey '^M' _th_return
-bindkey '^J' _th_newline
-bindkey '^[' _th_cancel
-zle -N accept-line _th_accept
+# Capture each supported map independently. Macros stay untouched rather than being replayed.
+_th_install_bindings() {
+  local map kind key REPLY
+  local -A names keys
+  keys=(tab '^I' return '^M' newline '^J' escape '^[')
+  zle -N _th_accept
+  zle -N _th_menu_accept
+  zle -N _th_cancel
+  for map in emacs viins; do
+    names=()
+    for kind key in "${(@kv)keys}"; do
+      if ! _th_binding_widget "$map" "$key"; then
+        _TH_MAP_STATUS[$map]="not installed: $kind binding is a macro or unsupported"
+        break
+      fi
+      names[$kind]=$REPLY
+    done
+    (( ${#names} == 4 )) || continue
+    # Never wrap one of our own widgets, even if a user copied a map before re-sourcing.
+    if [[ "${names[tab]}" == _th_* ]]; then
+      _TH_MAP_STATUS[$map]='not installed: helper binding already present'
+      continue
+    fi
+    for kind key in "${(@kv)keys}"; do
+      zle -A "${names[$kind]}" "_th_original_${kind}_$map"
+      zle -N "_th_${kind}_$map" "_th_$kind"
+      bindkey -M "$map" "$key" "_th_${kind}_$map"
+    done
+    _TH_TAB_NAMES[$map]=${names[tab]}
+    _TH_MAP_STATUS[$map]=integrated
+  done
+}
+_th_install_bindings
+unfunction _th_install_bindings

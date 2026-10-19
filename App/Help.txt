@@ -17,10 +17,10 @@ GET STARTED
 USING SUGGESTIONS
 Press Tab to request a compact completion list. The current choice is reverse-highlighted. Use arrow keys to move through the list (including rows beyond the visible area), Enter to insert the selected text, or Escape to cancel. Accepting edits the command line only. Press Enter again after the list closes to execute deliberately.
 
-Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects.
+Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed.
 
 OFF AND QUIT
-Turn off Enable suggestions to stop assistance and cancel a pending automatic update metadata request. Open shells check state at their next completion or acceptance. An existing completion menu may remain visible until that interaction. The idle menu-bar app stays resident while Off.
+Turn off Enable suggestions to stop Terminal Helper assistance and cancel a pending automatic update metadata request. Tab then delegates to the original supported shell binding; ordinary completion and third-party plugins can still do their own work. Unsafe key macros are left untouched. Open shells check state at Tab and before accepting a pending suggestion; an existing native menu may remain visible until it closes. The idle menu-bar app stays resident while Off.
 
 Disable and Quit writes Off, cancels any explicitly started update, terminates owned integration and update worker groups, waits for them to exit, and then closes the controller. Update cancellation allows time to detach the disk image and clean up validation work. The updater's own external quit request also writes Off and stops integration workers, while allowing that explicitly approved update process to finish replacing and reopening the app. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
 
@@ -61,3 +61,6 @@ PRIVACY AND COMPATIBILITY
 No command history, command buffers, environment contents, or filenames are logged or uploaded. Enabled automatic update checks and explicit update checks or downloads contact GitHub. Automatic metadata checks run only at the launch/enable boundaries and interval described above. The automatic-check preference, last attempt date, and skipped version are stored locally; no command data is stored for update notices. There is no cloud AI, telemetry, global keyboard monitoring, or background indexing. No Accessibility or screen-recording permission is needed.
 
 The free beta targets macOS 13 or later on Apple silicon and Intel. Automated macOS runner tests are documented separately; physical Terminal.app and iTerm2 behavior needs the documented manual verification. Ad-hoc beta builds are not Developer ID signed or notarized. Use only Apple's per-app process described above when you trust the download; managed Macs may restrict this option.
+
+DIAGNOSTICS
+Run terminal-helper doctor in the affected interactive shell. It reports app metadata separately from this shell's loaded integration, shared state and current keybinding ownership. It does not repair configuration, collect history or print environment values. If a later plugin replaced Tab, keep that binding or adjust plugin loading order deliberately; restart shells after integration updates.

@@ -128,7 +128,7 @@ final class BoundedRequest: NSObject, URLSessionDataDelegate {
 
 enum TerminalUpdates {
     typealias Fetch = (URL, Int, @escaping (Result<Data, Error>) -> Void) -> Void
-    static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.2"
+    static let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.3"
     static let releasesURL = URL(string: "https://github.com/denysshcherbak4/terminal-helper/releases")!
     static let catalogURL = URL(string: "https://api.github.com/repos/denysshcherbak4/terminal-helper/releases/latest")!
     static let maximumDownload = 64 * 1024 * 1024
