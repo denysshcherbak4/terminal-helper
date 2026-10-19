@@ -48,3 +48,7 @@
 
 
 **Doctor reports different versions.** App metadata and the integration already loaded in an open shell are separate facts. Restart that shell after installing/upgrading integration; running a new app cannot replace live widgets inside another process. Doctor only explains problems and never repairs files.
+
+**Control-X then Control-P does nothing.** This is an unmerged 0.4.0 preview; the public 0.3.2 release has no Python check. After installing the test artifact, restart shells and run terminal-helper doctor. An existing exact, parent or longer key sequence is preserved; deliberately keep that binding or choose your own. Finish any completion menu first.
+
+**The Python check declines my command.** Start with a simple pip install pandas in the directory directly containing .venv. The checker requires small valid metadata and an executable interpreter entry, without running it. It declines aliases/functions, known target/configuration overrides, other active environments, conflicting venv/env candidates, detectable remote contexts and complex syntax. It does not search parent directories. A reported match is shell-resolution evidence, not proof that pip will install successfully or use a particular destination.

@@ -37,3 +37,7 @@ GitHub hosting/downloads, Apple operating-system security checks and optional re
 ## Explicit shell diagnostics (development build)
 
 terminal-helper doctor runs in the shell where you invoke it. It reads bounded owned state/app metadata and current keybinding ownership to distinguish installation from a loaded integration. It does not repair configuration, inspect history, print command buffers or macro payloads, or dump environment values. App metadata cannot prove which code an already-open shell loaded. No diagnostic information is uploaded.
+
+## Explicit Python environment check (development preview)
+
+Only Control-X then Control-P requests inspection. The buffer stays in memory. The checker reads current-directory .venv metadata (a regular pyvenv.cfg of at most 4096 bytes), known local environment markers and shell resolution. It never executes discovered Python/pip/project programs, searches parents or recursively indexes files. Paths with terminal controls are declined. Evidence is displayed locally, never logged or uploaded; known override values are not printed. Off prevents these reads and insertion. Existing automatic-update policy is unchanged.

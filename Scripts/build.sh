@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version="${VERSION:-0.3.3}"
+version="${VERSION:-0.4.0}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'VERSION must be numeric major.minor.patch' >&2; exit 1; }
 [[ "$(uname -s)" == Darwin ]] || { echo 'Build requires macOS with Xcode command-line tools.' >&2; exit 1; }
 mkdir -p build dist

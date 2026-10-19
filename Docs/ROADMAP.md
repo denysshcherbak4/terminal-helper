@@ -1,3 +1,5 @@
-# Future scope
+# Deferred work
 
-After core safety and usability are verified: history suggestions, project-aware suggestions, richer command explanations, additional shells, and Homebrew distribution may be considered. Language object introspection would require a separate explicit design. None is part of this MVP.
+This iteration focuses on reliable completion/fallback, explicit diagnostics and a small Python environment check.
+
+Project-action menus, dataset content previews, general command explanations, history search/synchronization, automatic failed-command recovery, additional shells, Homebrew distribution and language-object introspection remain deferred. Cloud AI, accounts, dashboards and plugin marketplaces are outside the product scope.

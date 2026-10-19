@@ -160,3 +160,9 @@ The 30ms startup target was met on ARM and missed on Intel this run. The 100ms u
 
 
 [Public v0.3.2 production CLI installation passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39231135188): current updater source built with VERSION=0.1.0 as an older-version fixture anonymously downloaded and installed public 0.3.2. Digest, signature integrity, bundle/executable quarantine, retained previous app, Off, exact owned integration and preserved shell configuration passed. This is current source with an older fixture version, not a historical v0.1 binary. Launch Services reopening was requested; consumer Gatekeeper approval remains manual.
+
+## Current 0.4.0 development workflow
+
+The exact-source branch adds Python PTY sentinel tests, a 30-request first/warm context benchmark and a recorded mismatch/Insert demonstration. It also compares integrated completion with original configured and unconfigured Tab on the same runner/fixture. All Python executables in these context fixtures are inert sentinels; passing tests establish no probe execution, not real interpreter health.
+
+The current PR records fresh numeric results and run/artifact links separately from the historical tables above. No security checks are bypassed for timing. Unsupported native expansion widgets are declined while On, and Off deliberately preserves original shell behavior. A single owned integration file retains existing installer/updater byte-validation and rollback contracts.

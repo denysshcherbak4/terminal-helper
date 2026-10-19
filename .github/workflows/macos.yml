@@ -60,6 +60,9 @@ jobs:
       - name: ZLE tests
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py 2>&1 | tee results/shell-tests.txt
+      - name: Python environment ZLE tests
+        if: always() && !cancelled()
+        run: python3 Tests/Shell/test_python.py 2>&1 | tee results/python-tests.txt
       - name: Case-sensitive filesystem
         if: always() && !cancelled()
         run: |
@@ -130,6 +133,11 @@ jobs:
       - name: Original unconfigured first Tab timing
         if: always() && !cancelled()
         run: python3 Tests/Shell/test_pty.py --benchmark-uninitialized-baseline | tee results/completion-uninitialized-baseline.json
+      - name: Python check timing and demonstration
+        if: always() && !cancelled()
+        run: |
+          python3 Tests/Shell/test_python.py --benchmark | tee results/python-timing.json
+          python3 Tests/Shell/test_python.py --demo | tee results/python-demo.json
       - name: Performance and native smoke test
         if: always() && !cancelled() && steps.build.outcome == 'success'
         run: python3 Tests/Performance/measure.py
