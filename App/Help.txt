@@ -20,14 +20,18 @@ Press Tab to request a compact completion list. Use arrow keys to select, Enter 
 Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects.
 
 OFF AND QUIT
-Turn off Enable suggestions to stop assistance. Open shells check state at their next completion or acceptance. An existing completion menu may remain visible until that interaction. The idle menu-bar app stays resident while Off.
+Turn off Enable suggestions to stop assistance and cancel a pending automatic update metadata request. Open shells check state at their next completion or acceptance. An existing completion menu may remain visible until that interaction. The idle menu-bar app stays resident while Off.
 
 Disable and Quit writes Off, cancels any explicitly started update, terminates owned integration and update worker groups, waits for them to exit, and then closes the controller. Update cancellation allows time to detach the disk image and clean up validation work. The updater's own external quit request also writes Off and stops integration workers, while allowing that explicitly approved update process to finish replacing and reopening the app. Missing or malformed state leaves assistance disabled. You can keep using the shell normally.
 
 UPDATES
-Check for Updates in the menu bar or Settings contacts GitHub only when you request it. The current version is shown in both places. There is no automatic checking or background polling.
+Check for updates automatically is enabled by default in Settings. While suggestions are On, the app checks GitHub at a normal launch or when you enable suggestions, at most once every 24 hours from the last attempt. There is no timer: if you keep the app running, the next eligible check happens when you enable suggestions again or relaunch. No automatic request runs while suggestions are Off. Turning suggestions Off, disabling the checkbox, or quitting cancels a pending automatic check and ignores late responses.
 
-When a newer published release exists, Download Update verifies the disk image against its published checksum. Choose Install Update to approve in-place installation. A short-lived process from the current app validates the update before asking the controller to quit. It turns suggestions Off, replaces the app in the same location, updates the owned shell integration, and asks macOS to reopen Terminal Helper. Shell integration installation or removal must finish before an app update can start.
+A new-version notice offers Update Now, Remind Me Later, and Skip This Version. Update Now starts the existing download and verified installation flow. Remind Me Later dismisses the notice until the next eligible daily check; a clickable version offer stays in the menu. Skip This Version suppresses automatic notices for that exact version, while a newer version can still be offered.
+
+Check for Updates in the menu bar or Settings is always an explicit action, even while suggestions are Off. It ignores the skipped version and daily throttle, and records its attempt so an automatic check does not immediately repeat a reminder. The current version is shown in both places. Automatic connection errors stay inline instead of opening an error alert; use the manual action to retry.
+
+When a newer published release exists, Update Now downloads the disk image and verifies its published checksum. Choose Install Update to approve in-place installation. A short-lived process from the current app validates the update before asking the controller to quit. It turns suggestions Off, replaces the app in the same location, updates the owned shell integration, and asks macOS to reopen Terminal Helper. Shell integration installation or removal must finish before an app update can start.
 
 Restart open terminal shells after the update, then enable suggestions again. The updater preserves quarantine and does not change macOS security settings, remove security attributes, or request administrator privileges. Because this beta is ad-hoc signed and not notarized, macOS may require your approval to reopen it; use Apple's per-app process above only if you trust the download.
 
@@ -54,6 +58,6 @@ UNINSTALL
 Choose Uninstall shell integration in Settings and use the same configuration folder. Restart open terminal shells, choose Disable and Quit, then remove Terminal Helper from Applications. Keep any configuration backup you want to retain.
 
 PRIVACY AND COMPATIBILITY
-No command history, command buffers, environment contents, or filenames are logged or uploaded. Explicit update checks and downloads contact GitHub; no checks run automatically. There is no cloud AI, telemetry, global keyboard monitoring, or background indexing. No Accessibility or screen-recording permission is needed.
+No command history, command buffers, environment contents, or filenames are logged or uploaded. Enabled automatic update checks and explicit update checks or downloads contact GitHub. Automatic metadata checks run only at the launch/enable boundaries and interval described above. The automatic-check preference, last attempt date, and skipped version are stored locally; no command data is stored for update notices. There is no cloud AI, telemetry, global keyboard monitoring, or background indexing. No Accessibility or screen-recording permission is needed.
 
 The free beta targets macOS 13 or later on Apple silicon and Intel. Automated macOS runner tests are documented separately; physical Terminal.app and iTerm2 behavior needs the documented manual verification. Ad-hoc beta builds are not Developer ID signed or notarized. Use only Apple's per-app process described above when you trust the download; managed Macs may restrict this option.
