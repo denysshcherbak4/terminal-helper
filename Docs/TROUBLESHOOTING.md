@@ -27,7 +27,7 @@
 
 **A download fails or its checksum differs.** Retry later and check GitHub connectivity/rate limits. Mismatched, oversized or invalid app bundles are not installed; validation failures leave the previous app untouched. Never bypass the check or run a remote installer script.
 
-**My 0.2 update command still opens a DMG.** That is the old client's behavior. Make one final manual Finder upgrade to 0.3 when it is published, open it, repair integration if prompted and restart shells. Subsequent updates from 0.3+ can install in place.
+**My 0.2 update command still opens a DMG.** That is the old client's behavior. Make one final manual Finder upgrade to published 0.3, open it, repair integration if prompted and restart shells. Subsequent updates from 0.3+ can install in place.
 
 **Automatic installation refuses the location or permissions.** It supports exactly `~/Applications/Terminal Helper.app` or an eligible user-owned `/Applications/Terminal Helper.app`, with a writable app and safe parent. Quit, move the app in Finder to `~/Applications`, reopen and repair integration. Do not use `sudo`, weaken parent permissions or change system-folder ownership to force an update.
 
@@ -36,3 +36,9 @@
 **Reopening is blocked or suggestions remain Off after an update.** Launch Services retains macOS opening checks and quarantine. Follow ordinary per-app approval only if you trust the exact download; managed restrictions may still prevent opening. Restart shells, then deliberately enable suggestions. Installation does not enable them automatically.
 
 **An update was interrupted or I need the previous app.** A private `.Terminal-Helper-update-<UUID>` folder beside the app retains `Terminal Helper.app` and `RECOVERY.txt`. Quit the app, open that matching folder in Finder with Go → Go to Folder, and follow its recovery instructions. Handled installation errors roll back the app and owned integration bytes, but an unexpected shutdown is not guaranteed to leave both in the same version. Keep the backup until the new version works. After restoring, repair integration if prompted and restart shells. Do not recursively delete the support directory or bypass macOS security checks.
+
+**No automatic update notice appears (0.3.1).** Confirm suggestions are On and Settings → Check for updates automatically is enabled. A normal launch or a genuine Off→On change checks eligibility; merely leaving the app running does not schedule another check. The 24-hour window starts at the request attempt, including a failed or cancelled request. An exact skipped version is suppressed automatically. Use Check for Updates or `terminal-helper check` at any time for a manual result, including while Off; manual checks ignore the automatic cooldown and skipped version. Public 0.3.0 does not yet have these automatic notices.
+
+**Does Remind Me Later schedule tomorrow's notification?** No. It keeps the version eligible for the next launch/enable event after the attempt's 24-hour window. There is no daily timer or midnight check. Skip This Version suppresses only that version's automatic offer; a future newer version can still appear when eligible.
+
+**I do not want automatic metadata requests.** Disable Check for updates automatically in Settings; the choice is remembered. Suggestions Off also prevents automatic checks and cancels pending ones. This does not disable explicit Check for Updates or `terminal-helper check/update`. Automatic checks fetch metadata only; downloading/installing still requires Update Now or an explicit update command.

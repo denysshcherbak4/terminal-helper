@@ -10,11 +10,15 @@ Private On/Off state and integration live under ~/Library/Application Support/Te
 
 The local preference ShellConfigurationDirectory (domain io.github.denysshcherbak4.terminal-helper) remembers the successful configuration-folder selection. Integration uninstall clears it. Configuration backups beside .zshrc contain the previous file and stay on your device.
 
-## Updates are explicit
+Automatic-notice preferences are local UserDefaults data: `AutomaticUpdateChecksEnabled` (default true when absent), `AutomaticUpdateLastAttempt` (request-attempt date), and `AutomaticUpdateSkippedVersion` (one exact version). Turning the setting off is preserved. These records contain no history, command buffers or environment data and are not sent to GitHub.
 
-There is no startup request, periodic checker, telemetry beacon or automatic download. Check for Updates and terminal-helper check/update contact GitHub's public release API. A requested download contacts this repository's HTTPS GitHub Release assets and GitHub's asset CDN. Requests use a generic Terminal Helper user agent, without an account, credentials or device identifier. GitHub/CDN sees ordinary metadata including IP address; its policies apply.
+## Update notices and explicit installation
 
-The installed version is compared locally and is not included in the request. Only published release metadata and requested archives/checksums are fetched. Suggestions Off prevents automatic assistance work; it does not block an update action you explicitly request.
+In 0.3.0, checks are manual. Upcoming 0.3.1 can request GitHub's public release metadata at a normal app launch or a real change from suggestions Off to On, only when suggestions are On and **Check for updates automatically** is enabled. A 24-hour attempt cooldown applies; failed or cancelled attempts count. There is no persistent daily timer, daemon or telemetry beacon, so a continuously running On app checks again only at a later eligible launch/enable event. Clock rollback can reset eligibility rather than blocking it indefinitely.
+
+Off cancels pending automatic checks and suppresses late offers. Disabling the checkbox prevents automatic checking without requiring suggestions to be disabled. Manual Check for Updates and terminal-helper check/update remain available while Off and ignore the automatic cooldown/skipped version. Automatic requests fetch catalog metadata only, never the checksum, DMG or app. **Update Now** or an existing explicit update action is required before download/install. A requested download contacts this repository's HTTPS GitHub Release assets and GitHub's asset CDN. Requests use a generic Terminal Helper user agent, without an account, credentials or device identifier. GitHub/CDN sees ordinary metadata including IP address; its policies apply.
+
+The installed version is compared locally and is not included in the request. Only published release metadata and requested archives/checksums are fetched. Suggestions Off prevents automatic assistance and automatic update-notice requests; it does not block an update action you explicitly request. Remind Me Later waits for the next eligible event; Skip This Version records only the exact automatic offer, and does not suppress manual checks or future versions.
 
 Verified DMGs are saved in a new private `Downloads/Terminal Helper <version> <UUID>` folder, retaining macOS quarantine. Delete them after installing if desired.
 
@@ -26,6 +30,6 @@ A private `.Terminal-Helper-update-<UUID>` folder beside the app retains the pre
 
 No global keyboard-monitoring, Accessibility, Screen Recording or password-interception permission is requested. A folder picker and Apple's per-app opening approval are explicit user actions.
 
-Uninstall removes the owned block, integration, state and app-path marker, preserving unrelated configuration and backups. Restart shells before deleting the app or remaining owned support files. Delete saved download folders and retained app-backup folders separately. There is no Terminal Helper cloud account or server data to erase.
+Uninstall removes the owned block, integration, state and app-path marker, preserving unrelated configuration and backups. Restart shells before deleting the app or remaining owned support files. Delete saved download folders and retained app-backup folders separately. Removing integration does not reset the automatic-check preference or its local attempt/skip records. These app preferences may remain after the app is deleted; they stay on your device. There is no Terminal Helper cloud account or server data to erase.
 
 GitHub hosting/downloads, Apple operating-system security checks and optional reports are separate services. Send only synthetic, redacted reproductions in reports.
