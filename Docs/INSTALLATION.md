@@ -1,6 +1,6 @@
 # Install the free community beta
 
-Download the latest published universal DMG from [GitHub Releases](https://github.com/denysshcherbak4/terminal-helper/releases). Public downloads require no GitHub account or build tools. The current published version is 0.3.1, with in-place installation for subsequent updates. Green CI artifacts are for review, require GitHub sign-in and expire after 14 days.
+Download the latest published universal DMG from [GitHub Releases](https://github.com/denysshcherbak4/terminal-helper/releases). Public downloads require no GitHub account or build tools. The current published version is 0.3.2, with in-place installation for subsequent updates. Green CI artifacts are for review, require GitHub sign-in and expire after 14 days.
 
 1. Open the DMG and drag Terminal Helper to **Applications inside your home folder** (`~/Applications`); create it in Finder if needed. This is recommended for installation and updates without administrator rights. `/Applications` also works when your account owns and can write this app.
 2. Open it. The free beta is ad-hoc signed, not Developer ID-signed or notarized. Users trusting the exact source may follow [Apple’s per-app process](https://support.apple.com/102445) after the first blocked opening attempt: System Settings → Privacy & Security → Open Anyway → Open. New versions may need approval again.
@@ -19,7 +19,7 @@ Choose Update Now to install, Remind Me Later to wait for the next eligible even
 
 ## Verify, update and remove
 
-Checksums in SHA256SUMS.txt and the per-DMG .sha256 file verify matching bytes, not publisher identity. From the folder containing the named DMG and checksum, optional native verification is shasum -a 256 -c Terminal-Helper-0.3.1-universal.dmg.sha256.
+Checksums in SHA256SUMS.txt and the per-DMG .sha256 file verify matching bytes, not publisher identity. From the folder containing the named DMG and checksum, optional native verification is shasum -a 256 -c Terminal-Helper-0.3.2-universal.dmg.sha256.
 
 **Already using 0.2?** Make one final manual upgrade to published 0.3: the old command opens the verified DMG, then Disable and Quit, replace in Finder, reopen, repair integration if prompted and restart shells. An old executable cannot perform the new installation flow.
 

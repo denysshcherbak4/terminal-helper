@@ -4,7 +4,7 @@
 
 ## Install on your Mac
 
-[**Download for Mac — v0.3.1 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.3.1/Terminal-Helper-0.3.1-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)
+[**Download for Mac — v0.3.2 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.3.2/Terminal-Helper-0.3.2-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)
 
 **Free community beta · macOS 13+ · Apple Silicon and Intel · no Xcode, Python, Node, or app account**
 
@@ -16,9 +16,9 @@
 
 A free signature does not identify the publisher to Apple or provide malware notarization. Never override a malware/damaged-app warning, globally disable Gatekeeper or remove quarantine. Per-app approval may be needed again after an update and can be unavailable on managed Macs. [Installation help](Docs/INSTALLATION.md)
 
-**Version 0.3.1 is published.** The direct download above includes in-place installation for subsequent updates. [Release notes and verification](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.1).
+**Version 0.3.2 is published.** Tab opens a highlighted selection menu; Up/Down choose an item, long lists scroll, Enter inserts text and Escape cancels. [Release notes and verification](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.2).
 
-**Already using v0.3.0?** Run `terminal-helper update` once to get automatic update notices. Restart shells and enable suggestions afterward.
+**Already using v0.3.0 or v0.3.1?** Run `terminal-helper update` to get the highlighted completion fix. Restart terminal windows and enable suggestions afterward.
 
 ## Update without building anything
 
