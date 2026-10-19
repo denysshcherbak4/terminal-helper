@@ -1,8 +1,8 @@
 # Updates
 
-## Automatic notices: upcoming 0.3.1
+## Automatic notices in 0.3.1
 
-The currently published download is 0.3.0. Version 0.3.1 adds **Check for updates automatically** in Settings, enabled by default; your choice to disable it is preserved.
+The current published download is 0.3.1. Version 0.3.1 adds **Check for updates automatically** in Settings, enabled by default; your choice to disable it is preserved.
 
 An automatic check requires **suggestions On** and that checkbox enabled. It can start at normal app launch or when suggestions genuinely change Off→On. It requests the public GitHub release catalog only. No checksum, DMG or app is downloaded until you explicitly choose **Update Now** or invoke the existing manual update action.
 

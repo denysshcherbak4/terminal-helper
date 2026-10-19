@@ -4,7 +4,7 @@
 
 ## Install on your Mac
 
-[**Download for Mac — v0.3.0 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.3.0/Terminal-Helper-0.3.0-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)
+[**Download for Mac — v0.3.1 →**](https://github.com/denysshcherbak4/terminal-helper/releases/download/v0.3.1/Terminal-Helper-0.3.1-universal.dmg) · [Releases and checksums](https://github.com/denysshcherbak4/terminal-helper/releases)
 
 **Free community beta · macOS 13+ · Apple Silicon and Intel · no Xcode, Python, Node, or app account**
 
@@ -16,9 +16,9 @@
 
 A free signature does not identify the publisher to Apple or provide malware notarization. Never override a malware/damaged-app warning, globally disable Gatekeeper or remove quarantine. Per-app approval may be needed again after an update and can be unavailable on managed Macs. [Installation help](Docs/INSTALLATION.md)
 
-**Version 0.3.0 is published.** The direct download above includes in-place installation for subsequent updates. [Release notes and verification](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.0).
+**Version 0.3.1 is published.** The direct download above includes in-place installation for subsequent updates. [Release notes and verification](https://github.com/denysshcherbak4/terminal-helper/releases/tag/v0.3.1).
 
-**Upcoming 0.3.1:** optional automatic update notices are being added on this branch. The public download above remains 0.3.0 until the new release is published.
+**Already using v0.3.0?** Run `terminal-helper update` once to get automatic update notices. Restart shells and enable suggestions afterward.
 
 ## Update without building anything
 
@@ -34,7 +34,7 @@ terminal-helper update
 
 **In v0.3 and later**, an explicit update action verifies and installs a newer app in place at `~/Applications/Terminal Helper.app` or an eligible user-owned `/Applications/Terminal Helper.app`. It retains an app backup, refreshes exact owned integration data without editing `.zshrc` or settings, and reopens through macOS Launch Services. **Suggestions remain Off: restart shells, then enable them.** Unsupported locations or permissions are refused without elevation. macOS approval may still be required.
 
-App archives are never downloaded or installed automatically. The upcoming 0.3.1 notice behavior below requests release metadata only. A maintainer must publish a new version before it is offered. Validation failures leave the installed app untouched; handled installation failures roll back. A retained backup supports interrupted-update recovery without promising a crash-proof app-and-integration transaction. [Update and recovery details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
+App archives are never downloaded or installed automatically. The 0.3.1 notice behavior below requests release metadata only. A maintainer must publish a new version before it is offered. Validation failures leave the installed app untouched; handled installation failures roll back. A retained backup supports interrupted-update recovery without promising a crash-proof app-and-integration transaction. [Update and recovery details](Docs/UPDATES.md) · [Maintainer release steps](Docs/RELEASING.md)
 
 ### Automatic update notices in 0.3.1
 
@@ -47,8 +47,8 @@ Turning Off cancels a pending automatic check; late results do not show an offer
 <details>
 <summary>See the native app</summary>
 
-![Terminal Helper 0.3 Settings in light appearance](.github/images/settings-light.png)
-![Terminal Helper 0.3 Settings in dark appearance](.github/images/settings-dark.png)
+![Terminal Helper 0.3.1 Settings in light appearance](.github/images/settings-light.png)
+![Terminal Helper 0.3.1 Settings in dark appearance](.github/images/settings-dark.png)
 
 </details>
 

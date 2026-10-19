@@ -33,13 +33,34 @@ Installed users can explicitly run `terminal-helper version`, `terminal-helper c
 
 
 
-## Upcoming 0.3.1 notice verification
+## Published 0.3.1 notice verification
 
-The 0.3.1 branch adds automatic metadata notices; this section describes the required coverage, **not a claim that the final release candidate has passed**. Keep the published 0.3 evidence and measurements above separate.
 
-`Tests/UpdateNotices` exercises default/preserved preference, 24-hour attempt eligibility, failed/cancelled-attempt throttling, clock rollback, exact skipped version and synthetic newer versions. Native `--update-notice-self-test` must cover launch/real-enable gating, checkbox persistence, Off cancellation and late-result suppression, Update Now/Later/Skip choices, manual bypass and no automatic checksum/DMG request. Existing installer, network, CLI, PTY and controller lifecycle checks remain required.
 
-Compile the policy fixture with `State.swift`, `Updates.swift`, `UpdateInstaller.swift` and `UpdateNotices.swift`. Run app/UI tests only on the disposable remote macOS runner described in the [reproducible commands](../README.md#verification-and-development). Record exact-source ARM/Intel results, explicit skips and native limits before publishing 0.3.1; do not invent new pass counts or reuse 0.3 timing as a new measurement.
+### Exact-source validation
+
+[ARM/Intel macOS CI passed](https://github.com/denysshcherbak4/terminal-helper/actions/runs/39213307870) at source 1097cf1dd3fd0f1840cbc76ff212751423a9773b. [PR #6](https://github.com/denysshcherbak4/terminal-helper/pull/6) merged as [81dd7fc](https://github.com/denysshcherbak4/terminal-helper/commit/81dd7fc94ed39d149a095207b59a32ad611ffb18), with an identical verified tree.
+
+Each architecture passed 34 persisted-policy assertions, 78 update/transport assertions including real request cancellation, 72 signed bundle/DMG installation assertions, native notice controls including Off/uninstall/stale-callback/skip/manual-override/real-modal fixtures, 8 shell-installer cases, 8 management-command cases, 32 PTY cases plus a dedicated case-sensitive fixture, real Launch Services handoff, state/Settings/lifecycle paths, universal signing and package verification. Lead inspected actual light/dark Settings renders: the checkbox and timing disclosure are readable and not clipped.
+
+Independent remote source/security/ponytail review found no unresolved confirmed finding after fixes. Formal Codex Security scanning requires a local checkout and was not run. Terminal.app AppleEvents/display smoke explicitly skipped. Consumer Gatekeeper approval, real Terminal.app/iTerm2, VoiceOver and oldest macOS 13 remain manual checks. Do not infer those from compilation or fixtures.
+
+### Measurements
+
+macOS 15.7.9, zsh 5.9, Swift 6.1.2; GitHub-hosted Apple M1 Virtual / Intel i7-8700B 3.20GHz. Completion: 256 entries and 30 repetitions. Startup: 40 paired fresh shells with identical compinit; no forced cache flush. Idle: 2s settle and six 1s samples. VM scheduling is noisy; first observations are not guaranteed cold filesystems.
+
+| Measurement | ARM | Intel |
+|---|---:|---:|
+| Configured first Tab | 42.96 ms | 55.61 ms |
+| Warm completion p95 | 7.49 ms | 14.38 ms |
+| Unconfigured first-Tab p95 | 504.74 ms | 862.24 ms |
+| Paired added-startup p95 | 1.31 ms | 88.51 ms |
+| Off median RSS | 50640 KiB | 24672 KiB |
+| Settled interval CPU | 0.55% | 0.36% |
+| Controller / owned children | 1 / 0 | 1 / 0 |
+
+30ms startup target: ARM met, Intel missed in this run. Unconfigured first-use 100ms target remains missed on both. Negative paired medians do not prove a speedup. App logical size 1245991 bytes; selected universal ZIP 463991 bytes; DMG 769123 bytes. Off remains an idle resident controller, not zero memory/CPU.
+
 
 ## Published 0.3 measured snapshot
 
