@@ -222,10 +222,9 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             showSettings(); return
         }
         do {
-            try state.write(enabled: !state.enabled()); operationStatus = ""
-            if state.enabled() { checkAutomaticallyIfDue() }
-            else { cancelAutomaticCheck() }
-            refresh()
+            if state.enabled() { try disableSuggestions() }
+            else { try state.write(enabled: true); checkAutomaticallyIfDue() }
+            operationStatus = ""; refresh()
         }
         catch { report("Could not change suggestions", detail: String(describing: error)) }
     }
@@ -369,11 +368,21 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             {
                 check(self.noticeTestOffers.last == "999.0.0" && self.noticeTestOffers.count == 3, "manual check presents skipped version")
                 check(self.updateButton?.isEnabled == true, "manual check remains available")
-                self.cancelAutomaticCheck()
+                self.automaticCheckbox?.state = .on; self.changeAutomaticChecks()
+                self.changeEnabled()
+                self.checkAutomaticallyIfDue(now: now.addingTimeInterval(6 * day), fetch: fetch)
+                check(calls == 8 && self.automaticCheckActive, "pending request before uninstall Off transition")
+                do { try self.disableSuggestions() }
+                catch { check(false, "shared uninstall Off transition") }
+                check(!self.state.enabled() && !self.automaticCheckActive && self.automaticRequest == nil, "uninstall shared Off transition cancels immediately")
+                respond("999.0.2")
+            },
+            {
+                check(self.noticeTestOffers.count == 3, "late response after uninstall Off transition is ignored")
                 defaults.removePersistentDomain(forName: suite)
                 do { try FileManager.default.removeItem(at: root) }
                 catch { check(false, "private fixture cleanup") }
-                print("PASS native update notices: default preference, Off cancellation, late responses, daily retry, reminder, skip, higher release and manual override (no network)")
+                print("PASS native update notices: default preference, Off cancellation, late responses, daily retry, reminder, skip, higher release, manual override and uninstall Off cancellation (no network)")
                 self.quitting = true; NSApp.terminate(nil)
             }
         ]
@@ -473,8 +482,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return .terminateNow
         }
         do {
-            try state.write(enabled: false)
-            cancelAutomaticCheck()
+            try disableSuggestions()
             quitting = true
             refresh()
             if let worker = worker, worker.isRunning {
@@ -492,8 +500,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func disableAndQuit() {
         guard !quitting || !cancelUpdateOnQuit else { return }
         do {
-            try state.write(enabled: false)
-            cancelAutomaticCheck()
+            try disableSuggestions()
             quitting = true; cancelUpdateOnQuit = true
             if updateInstaller != nil { updateStatus = "Cancelling the update before quitting…" }
             refresh()
@@ -580,6 +587,10 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
             helpWindow = w; w.center()
         }
         helpWindow?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    private func disableSuggestions() throws {
+        try state.write(enabled: false)
+        cancelAutomaticCheck()
     }
     private func cancelAutomaticCheck() {
         automaticGeneration += 1
@@ -748,7 +759,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.informativeText = "Suggestions will be disabled and the owned shell configuration block and integration files removed. Open shells must be restarted."
         alert.addButton(withTitle: "Uninstall"); alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do { try state.write(enabled: false) } catch { report("Could not disable safely", detail: String(describing: error)); return }
+        do { try disableSuggestions(); refresh() } catch { report("Could not disable safely", detail: String(describing: error)); return }
         runIntegration("uninstall")
     }
     private func runIntegration(_ operation: String) {
