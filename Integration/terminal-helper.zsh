@@ -1,7 +1,7 @@
 # Sourced by the explicitly installed interactive zsh integration.
 [[ -o interactive ]] || return 0
 (( ${+_TH_LOADED} )) && return 0
-typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW='' _TH_MENU_ACTIVE=0
+typeset -g _TH_LOADED=1 _TH_ACTIVE=0 _TH_ORIGINAL='' _TH_CURSOR=0 _TH_CANCELLED=0 _TH_READY=0 _TH_PREVIEW_SET=0 _TH_PREVIEW='' _TH_MENU_ACTIVE=0 _TH_SELECTING=0
 
 # Explicit management commands work independently of the suggestions switch.
 if ! whence -w terminal-helper >/dev/null 2>&1; then
@@ -126,22 +126,26 @@ _th_tab() {
     _TH_ACTIVE=1
   fi
   _TH_PREVIEW_SET=0
-  # Native selection continues after the completion call; retain this map until it ends.
-  if (( ! _TH_MENU_ACTIVE )); then
-    bindkey -N _th_helper_menu menuselect
-    bindkey -A menuselect _th_user_menu
-    bindkey -M _th_helper_menu '^M' _th_menu_accept
-    bindkey -M _th_helper_menu '^J' _th_menu_accept
-    bindkey -M _th_helper_menu '^I' menu-complete
-    bindkey -M _th_helper_menu '^[' _th_cancel
-    bindkey -A _th_helper_menu menuselect
-    _TH_MENU_ACTIVE=1
-  fi
+  # The native menuselect name is protected: change bindings, never replace its map.
+  bindkey -N _th_user_menu menuselect
+  bindkey -M menuselect '^M' _th_menu_accept
+  bindkey -M menuselect '^J' _th_menu_accept
+  bindkey -M menuselect '^I' menu-complete
+  bindkey -M menuselect '^[' _th_cancel
+  _TH_MENU_ACTIVE=1
+  _TH_SELECTING=1
   {
     zle _th_completion
   } always {
-    (( ! TRY_BLOCK_ERROR && _TH_ACTIVE )) || _th_restore_menu
+    _TH_SELECTING=0
+    _th_restore_menu
   }
+  if (( _TH_ACTIVE )) && ! _th_enabled; then
+    BUFFER=$_TH_ORIGINAL
+    CURSOR=$_TH_CURSOR
+    _TH_ACTIVE=0
+    _TH_CANCELLED=1
+  fi
   if (( _TH_ACTIVE )); then
     _TH_PREVIEW=$BUFFER
     _TH_PREVIEW_SET=1
@@ -159,9 +163,19 @@ _th_completion() {
 }
 
 _th_restore_menu() {
+  (( _TH_SELECTING )) && return 0
   if (( _TH_MENU_ACTIVE )); then
-    bindkey -A _th_user_menu menuselect
-    bindkey -D _th_helper_menu _th_user_menu
+    local key
+    local -a binding
+    for key in '^M' '^J' '^I' '^['; do
+      binding=( ${(z)"$(bindkey -M _th_user_menu -L "$key")"} )
+      if (( ${binding[(Ie)-s]} )); then
+        bindkey -M menuselect -s "${(@Q)binding[-2,-1]}"
+      else
+        bindkey -M menuselect "${(@Q)binding[-2,-1]}"
+      fi
+    done
+    bindkey -D _th_user_menu
     _TH_MENU_ACTIVE=0
   fi
 }
@@ -182,6 +196,7 @@ _th_accept() {
 }
 
 _th_cancel() {
+  if (( _TH_CANCELLED )); then _TH_CANCELLED=0; return 0; fi
   if (( _TH_ACTIVE )); then
     BUFFER=$_TH_ORIGINAL
     CURSOR=$_TH_CURSOR
@@ -198,6 +213,7 @@ _th_cancel() {
 }
 
 _th_redraw() {
+  (( _TH_SELECTING )) && return 0
   if (( _TH_ACTIVE )) && ! _th_enabled; then
     BUFFER=$_TH_ORIGINAL
     CURSOR=$_TH_CURSOR
