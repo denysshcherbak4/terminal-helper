@@ -177,7 +177,7 @@ class CompletionTests(unittest.TestCase):
     def test_native_menu_macro_is_restored_without_running_it(self):
         self.shell.send("zmodload zsh/complist; bindkey -M menuselect -s '^M' 'MACRO_LITERAL \"quoted\" $(touch MENU_MACRO_RAN)'; bindkey -M menuselect -L '^M'\n")
         before = self.shell.read()
-        original = next(line for line in before.splitlines() if line.startswith('bindkey -M menuselect -s '))
+        original = next(line for line in before.splitlines() if line.startswith('bindkey ') and 'menuselect' in line and ' -s ' in line)
         for name in ['ChoiceOne', 'ChoiceTwo']:
             (self.home / name).mkdir()
         for ending, disable in [('\r', False), ('\x1b', False), ('\r', True)]:
