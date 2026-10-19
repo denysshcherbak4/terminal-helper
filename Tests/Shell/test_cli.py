@@ -132,7 +132,7 @@ class ManagementCommandTests(unittest.TestCase):
         result = self.shell('terminal-helper doctor')
         self.assertEqual(result.returncode, 0, result.stderr)
         integration = (ROOT / 'Integration/terminal-helper.zsh').read_text()
-        version = re.search(r'^typeset -gr _TH_INTEGRATION_VERSION=(\\S+)$', integration, re.M).group(1)
+        version = re.search(r'^typeset -gr _TH_INTEGRATION_VERSION=([0-9.]+)$', integration, re.M).group(1)
         self.assertIn('Terminal Helper integration: ' + version, result.stdout)
         self.assertIn('Shared state: Off', result.stdout)
         self.assertIn('App version: 0.3.3 (recorded app metadata)', result.stdout)

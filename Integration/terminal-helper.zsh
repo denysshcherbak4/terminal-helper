@@ -67,7 +67,7 @@ _th_binding_widget() {
   (( $#binding )) || { REPLY=unavailable; return 1; }
   (( ${binding[(Ie)-s]} )) && { REPLY=macro; return 1; }
   REPLY=${(Q)binding[-1]}
-  (( ${+widgets[$REPLY]} )) && [[ "$REPLY" != undefined-key ]]
+  (( ${+widgets[$REPLY]} ))
 }
 
 _th_doctor() {
@@ -120,8 +120,12 @@ _th_doctor() {
     fi
     print -r -- "$map Tab: ${(qqqq)owner}; $diag_status"
     if _th_binding_widget "$map" '^X^P'; then
-      shortcut=${(qqqq)REPLY}
-      [[ "$REPLY" == _th_python_* ]] || shortcut="$shortcut (existing binding; left untouched)"
+      if [[ "$REPLY" == undefined-key ]]; then
+        shortcut=available
+      else
+        shortcut=${(qqqq)REPLY}
+        [[ "$REPLY" == _th_python_* ]] || shortcut="$shortcut (existing binding; left untouched)"
+      fi
     elif [[ "$REPLY" == macro ]]; then
       shortcut='macro (left untouched)'
     else
