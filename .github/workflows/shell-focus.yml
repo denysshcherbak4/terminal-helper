@@ -1,0 +1,37 @@
+name: Shell safety probe
+on:
+  push:
+    branches: [feature/foundation-fallback-doctor]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Unconfigured original Tab expansion probe
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys, tempfile
+          sys.path.insert(0, 'Tests/Shell')
+          from test_pty import Shell
+          for integrated in (False, True):
+              with tempfile.TemporaryDirectory() as tmp:
+                  home = pathlib.Path(tmp)
+                  base = home / 'Library/Application Support/Terminal Helper'
+                  base.mkdir(parents=True, mode=0o700)
+                  (base / 'state').write_text('terminal-helper-v1:on\n')
+                  (base / 'state').chmod(0o600)
+                  shell = Shell(home, integrated=integrated, initialize_completion=False)
+                  try:
+                      for label, expression in [('dollar', '$(touch SENTINEL)'), ('backtick', '`touch SENTINEL`')]:
+                          marker = home / ('probe-' + label)
+                          shell.send('\x15print ' + expression.replace('SENTINEL', str(marker)) + '\t')
+                          shell.read(0.8)
+                          print(json.dumps({'integrated': integrated, 'syntax': label, 'substitution_executed': marker.exists(), 'dump': shell.buffer()}))
+                  finally:
+                      shell.close()
+          PY
