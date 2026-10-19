@@ -20,6 +20,8 @@ A free signature does not identify the publisher to Apple or provide malware not
 
 **Already using v0.3.0 or v0.3.1?** Run `terminal-helper update` to get the highlighted completion fix. Restart terminal windows and enable suggestions afterward.
 
+**Development preview (0.3.3):** this branch adds original-Tab fallback and a live-shell doctor command. The public v0.3.2 download above does not contain these changes; review the exact-source CI test artifact.
+
 ## Update without building anything
 
 Choose **Check for Updates…** in the menu-bar app, or run this after installing integration:
@@ -67,7 +69,7 @@ Acceptance edits the buffer without executing it. Unsupported expressions retain
 
 **On:** assistance is available in integrated interactive shells.
 
-**Off:** no automatic suggestion generation, directory scanning, helper processes, polling or network requests. Tab is inert. The idle controller remains resident and uses memory. Explicit install/removal and requested update commands still work; an explicit update action contacts GitHub even while suggestions are Off.
+**Off in this development build:** Terminal Helper does not generate suggestions, scan directories or poll. Tab delegates to the original supported binding, so ordinary completion and third-party plugins may still do their own work. Unsafe macros stay untouched. The idle controller remains resident and uses memory. Explicit install/removal, doctor and requested update commands still work. Published v0.3.2 still has the earlier inert-Tab behavior.
 
 **Disable and Quit:** save Off, terminate owned installer workers and exit. Shells recheck state at their next completion/acceptance interaction. Missing or malformed state disables assistance; a controller crash can leave the last enabled state.
 
@@ -121,3 +123,7 @@ bash Scripts/package.sh
 The controller fixture runs **after the app build** and opens an unquarantined CI-built copy through Launch Services. This verifies the quit/Off handoff, not a downloaded app's Gatekeeper approval. Standalone update tests require the shared sources shown above; notice-policy tests additionally include App/UpdateNotices.swift. Record results only from the final exact-source complete CI run.
 
 The app targets macOS 13 and contains arm64/x86_64. Editable icon sources are in Assets/ and App/Icon.swift. Licensed under [GNU GPLv3 only](LICENSE) (GPL-3.0-only). Distributed derivatives must provide corresponding source under GPLv3; commercial use is allowed. Published releases through v0.3.1 remain MIT-licensed. See [licensing notices](NOTICE).
+
+## Diagnose this shell (development preview)
+
+Run terminal-helper doctor in the affected interactive zsh. It distinguishes app metadata from the integration loaded in that shell, shared state and live Tab ownership/conflicts. It never repairs configuration or prints history, command buffers, macro payloads or environment values. Restart shells after integration upgrades; later plugin bindings remain authoritative. Unsupported custom-correction syntax delegates to the original supported completion widget, whose existing third-party code retains its own trust boundary.
