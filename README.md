@@ -1,6 +1,6 @@
 # Terminal Helper
 
-**Helpful terminal suggestions, with one switch to turn them off.**
+**Choose the right command, in the right environment, without leaving your terminal.**
 
 ## Install on your Mac
 
@@ -20,7 +20,7 @@ A free signature does not identify the publisher to Apple or provide malware not
 
 **Already using v0.3.0 or v0.3.1?** Run `terminal-helper update` to get the highlighted completion fix. Restart terminal windows and enable suggestions afterward.
 
-**Development preview (0.3.3):** this branch adds original-Tab fallback and a live-shell doctor command. The public v0.3.2 download above does not contain these changes; review the exact-source CI test artifact.
+**Development preview (0.4.0):** this branch adds original-Tab fallback, live-shell diagnostics and an explicit Python environment check. The public v0.3.2 download above does not contain these changes; review the exact-source CI test artifact.
 
 ## Update without building anything
 
@@ -65,6 +65,14 @@ Terminal Helper is a native menu-bar app for interactive zsh. Terminal.app is th
 
 Acceptance edits the buffer without executing it. Unsupported custom correction preserves input; delegated user widgets can perform their original edits. Corrections do not recurse, decline above 256 sibling entries, and offer at most 20 results. Native/third-party completion can still be expensive on large or remote directories.
 
+## Check a Python install command (development preview)
+
+In a project that directly contains an identifiable .venv, type pip install pandas or python -m pip install pandas, then press **Control-X, then Control-P**. The shortcut is installed only when its key sequence is free; existing bindings are preserved.
+
+The terminal shows shell resolution, project-environment evidence, any mismatch and a proposed interpreter-specific command. **Enter inserts text; Escape dismisses and preserves the original text/cursor. Execution requires a separate Enter.** Editing also dismisses the offer.
+
+This bounded local check never runs Python, pip, project code or discovered executables. Metadata identifies a candidate, not a safe or healthy interpreter. Aliases, functions, explicit target options, conflicting environments and complex shell expressions are declined. [Supported subset, example and limitations](Docs/PYTHON-ASSISTANCE.md).
+
 ## One switch
 
 **On:** assistance is available in integrated interactive shells.
@@ -100,6 +108,7 @@ Run these commands **only on a disposable remote macOS runner**, with no running
 ```sh
 bash Scripts/build.sh
 python3 Tests/Shell/test_pty.py
+python3 Tests/Shell/test_python.py
 python3 Tests/Shell/test_install.py
 python3 Tests/Shell/test_cli.py
 swiftc App/State.swift App/Updates.swift App/UpdateInstaller.swift Tests/Updates/main.swift -o build/update-tests -framework AppKit -framework CoreServices

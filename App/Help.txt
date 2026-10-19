@@ -1,5 +1,5 @@
 TERMINAL HELPER
-Helpful terminal suggestions, with one switch to turn them off.
+Choose the right command, in the right environment, without leaving your terminal.
 
 INSTALLING THE FREE BETA
 The free beta is ad-hoc signed, without Developer ID or Apple notarization. Download only from the project's published GitHub release and verify its checksum. Open the disk image, drag Terminal Helper to Applications, then open the app from Applications.
@@ -18,6 +18,13 @@ USING SUGGESTIONS
 Press Tab to request a compact completion list. The current choice is reverse-highlighted. Use arrow keys to move through the list (including rows beyond the visible area), Enter to insert the selected text, or Escape to cancel. Accepting edits the command line only. Press Enter again after the list closes to execute deliberately.
 
 Files, directories, executable names, and your existing command completions are supported. Typo corrections are marked separately. Valid paths are preserved. Shell completion cannot inspect Python or Jupyter runtime objects. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed.
+
+CHECK A PYTHON INSTALL COMMAND
+In the project directory directly containing .venv, type a simple pip install or python -m pip install command. Press Control-X, then Control-P. Existing shortcuts and prefixes are preserved; terminal-helper doctor reports a conflict if this sequence is unavailable.
+
+Read the resolved command, environment candidate, mismatch and proposal in the terminal. Enter inserts text only; Escape restores the original text and cursor. A separate Enter executes. Editing dismisses the offer. Off prevents inspection and pending insertion.
+
+This check reads bounded local metadata and shell resolution. It never runs Python, pip or project executables, activates an environment or installs packages. Metadata cannot establish executable safety, runtime health or pip's final destination. Aliases, functions, target overrides, conflicting environments, remote/container markers and complex syntax are declined. Only the current directory is checked; no ancestor search or indexing occurs.
 
 OFF AND QUIT
 Turn off Enable suggestions to stop Terminal Helper assistance and cancel a pending automatic update metadata request. Tab then delegates to the original supported shell binding; ordinary completion and third-party plugins can still do their own work. Unsafe key macros are left untouched. Open shells check state at Tab and before accepting a pending suggestion; an existing native menu may remain visible until it closes. The idle menu-bar app stays resident while Off.

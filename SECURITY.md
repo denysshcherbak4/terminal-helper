@@ -39,3 +39,9 @@ The independent review reads source through GitHub APIs. The formal Codex Securi
 ## Binding and diagnostic boundary (development build)
 
 Capture supported original widget bindings per keymap once. While On, unsupported syntax declines known native expansion widgets (including dot-prefixed builtins), because they can execute substitutions before completion. Other captured completion widgets retain their existing user-configured behavior and trust boundary. Off delegates the original supported Tab behavior, including any expansion it already performed. Unsafe key macros must remain untouched. Never reclaim a later plugin binding automatically; repeated sourcing/toggles must not stack wrappers. Pending helper acceptance rechecks state, and native menu bindings must be restored. Doctor collects live facts in the invoking shell; an app subprocess must not pretend to know its parent shell widgets. Do not expose macro payloads, environment contents or command history.
+
+## Python context boundary (development preview)
+
+The supported grammar is bare pip/pip3 install or python/python3 -m pip install with literal arguments. Use zsh lexical handling, never eval. Preserve the raw argument tail. Decline complex syntax, known overrides/remote markers, aliases/functions, explicit target options and ambiguous environment candidates.
+
+Inspect only current-PWD .venv: bounded regular metadata, no symlinked environment directory, stable file identity, and an executable interpreter entry. Standard interpreter symlinks may exist. Metadata and shell resolution are evidence, not proof of code safety, runtime health or package destination. Never execute Python, pip, discovered binaries or project scripts. Recheck state and evidence before Insert, which changes text only. Keep untrusted display strings control-free and shell quoted. Sentinel PTY tests must prove inspection does not execute discovered code.
