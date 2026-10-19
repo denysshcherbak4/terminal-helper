@@ -126,11 +126,16 @@ _th_tab() {
     _TH_ACTIVE=1
   fi
   _TH_PREVIEW_SET=0
+  # Keep Up/Down useful even when native completion lays out matches in one row.
   # The native menuselect name is protected: change bindings, never replace its map.
   bindkey -N _th_user_menu menuselect
   bindkey -M menuselect '^M' _th_menu_accept
   bindkey -M menuselect '^J' _th_menu_accept
   bindkey -M menuselect '^I' menu-complete
+  bindkey -M menuselect '^[[B' menu-complete
+  bindkey -M menuselect '^[OB' menu-complete
+  bindkey -M menuselect '^[[A' reverse-menu-complete
+  bindkey -M menuselect '^[OA' reverse-menu-complete
   bindkey -M menuselect '^[' _th_cancel
   _TH_MENU_ACTIVE=1
   _TH_SELECTING=1
@@ -167,7 +172,7 @@ _th_restore_menu() {
   if (( _TH_MENU_ACTIVE )); then
     local key
     local -a binding
-    for key in '^M' '^J' '^I' '^['; do
+    for key in '^M' '^J' '^I' '^[' '^[[B' '^[OB' '^[[A' '^[OA'; do
       binding=( ${(z)"$(bindkey -M _th_user_menu -L "$key")"} )
       if (( ${binding[(Ie)-s]} )); then
         bindkey -M menuselect -s "${(@Q)binding[-2,-1]}"

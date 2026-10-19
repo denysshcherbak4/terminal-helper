@@ -365,6 +365,15 @@ class CompletionTests(unittest.TestCase):
 
 
 
+
+    def test_down_arrow_selects_second_short_candidate_in_same_row(self):
+        for name in ['ChoiceOne', 'ChoiceTwo']:
+            (self.home / name).mkdir()
+        self.complete('cd Cho')
+        self.shell.send('\x1b[B\r')
+        self.shell.read()
+        self.assertIn('DUMP:"cd ChoiceTwo/":13', self.shell.buffer())
+
     def test_arrow_navigation_selects_exact_nonfirst_candidate(self):
         names = ['Choice_%02d_long_directory_name_for_single_column' % i for i in range(1, 5)]
         for name in names:
